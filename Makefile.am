@@ -61,6 +61,7 @@ conf_SCRIPTS=tpm-luks.conf
 CLEANFILES = yum/tpm-luks.action tpm-luks.conf
 
 yum/tpm-luks.action: yum/tpm-luks.action.in
+	mkdir -p yum
 	@SED@ -e s!\@sbindir\@!"@sbindir@"!g < $< > $@-t
 	mv $@-t $@
 
