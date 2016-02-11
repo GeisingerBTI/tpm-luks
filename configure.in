@@ -19,7 +19,7 @@ elif `egrep -q ".*release 7" /etc/redhat-release`; then
 	AM_CONDITIONAL([RHEL6], false)
 	AM_CONDITIONAL([RHEL7], true)
 	AM_CONDITIONAL([FEDORA17], false)
-	AC_SUBST(DRACUT_MODULE_NAME, [plymouth])
+	AC_SUBST(DRACUT_MODULE_NAME, [crypt])
 	AC_SUBST(DRACUT_KERNEL_MODULES, [""])
 else
 	AM_CONDITIONAL([FEDORA17], true)
