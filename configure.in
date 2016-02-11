@@ -9,18 +9,21 @@ AC_CONFIG_MACRO_DIR([m4])
 CFLAGS="$CFLAGS -W -Wall -Wno-unused-parameter -Wsign-compare"
 AC_PROG_CC
 
-if `egrep -q "Red Hat Enterprise Linux.*release 6" /etc/*-release`; then
+if `egrep -q ".*release 6" /etc/redhat-release`; then
 	AM_CONDITIONAL([RHEL6], true)
+	AM_CONDITIONAL([RHEL7], false)
 	AM_CONDITIONAL([FEDORA17], false)
 	AC_SUBST(DRACUT_MODULE_NAME, [plymouth])
 	AC_SUBST(DRACUT_KERNEL_MODULES, [""])
-elif `egrep -q "CentOS release 6" /etc/*-release`; then
-	AM_CONDITIONAL([RHEL6], true)
+elif `egrep -q ".*release 7" /etc/redhat-release`; then
+	AM_CONDITIONAL([RHEL6], false)
+	AM_CONDITIONAL([RHEL7], true)
 	AM_CONDITIONAL([FEDORA17], false)
 	AC_SUBST(DRACUT_MODULE_NAME, [plymouth])
 	AC_SUBST(DRACUT_KERNEL_MODULES, [""])
 else
 	AM_CONDITIONAL([FEDORA17], true)
+	AM_CONDITIONAL([RHEL7], false)
 	AM_CONDITIONAL([RHEL6], false)
 	AC_SUBST(DRACUT_MODULE_NAME, [crypt])
 	AC_SUBST(DRACUT_KERNEL_MODULES, ["tpm_bios tpm tpm_tis"])
