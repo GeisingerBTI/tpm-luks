@@ -446,8 +446,6 @@ while getopts "kcao:mrw:l:s:i:d:p:P:q:yh" opt; do
 	y)
 		OWNERPASS="-y"
 		;;
-	z)
-	    
 	*)
 		usage
 		exit 255
