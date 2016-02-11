@@ -64,6 +64,13 @@ BOOT_CFG=
 OUTFILE=/dev/stdout
 BOOT_DEV=/dev/sda
 
+TPM_DEVICE=/sys/class/misc/tpm0
+if test $(uname -r | cut -d. -f1) -ge 3; then
+	TPM_DEVICE=/sys/class/tpm/tpm0
+fi
+
+PCR_SOURCE=$TPM_DEVICE/device/pcrs
+
 if [ -z "${PCRS}" ]; then
 	exit 0
 elif [ ! -e ${SOURCE} ]; then
@@ -123,7 +130,8 @@ cleanup()
 }
 
 TMPFILE=$(mktemp -q /tmp/${0##*/}-XXXXXX)
-TPMCFG=$(mktemp -q /tmp/${0##*/}-XXXXXX)
+TMPCFG=$(mktemp -q /tmp/${0##*/}-XXXXXX)
+TMPPCR=$(mktemp -q /tmp/${0##*/}-XXXXXX)
 
 if [ ! -n "$TMPFILE" ]; then
 	echo "Temp file creation failed" 1>&2
@@ -131,37 +139,33 @@ if [ ! -n "$TMPFILE" ]; then
 fi
 if [ ! -n "$TMPCFG" ]; then
 	rm -f $TMPFILE
-	echo "Temp file creation failed" 1>&2
+	echo "Temp config file creation failed" 1>&2
+	exit -1
+fi
+if [ ! -n "$TMPPCR" ]; then
+	rm -f $TMPFILE
+	rm -f $TMPCFG
+	echo "Temp PCR file creation failed" 1>&2
 	exit -1
 fi
 
-
 trap cleanup EXIT
 
+cat $PCR_SOURCE | sed "s/ //g" > $TMPPCR
+for PCRNUM in $PCRS; do
+
+done
+
 grep -zPo 'menuentry [^{]*{[^}]*}' $BOOT_CFG | sed ':again;$!N;$!b again; s/}.*//' > $TMPCFG
-KERNEL="$BOOT_DIR/$(grep '^\Wlinux' $TMPCFG | awk '{print $2}')"
-INITRD="$BOOT_DIR/$(grep '^\Winitrd' $TMPCFG | awk '{print $2}')"
+KERNEL="${BOOT_DIR}$(grep '^\Wlinux' $TMPCFG | awk '{print $2}')"
+INITRD="${BOOT_DIR}$(grep '^\Winitrd' $TMPCFG | awk '{print $2}')"
 
 #echo "Writing PCRs for \"$MENU\" boot entries:"
 	
 #echo -n "$e: \"${TITLES[$e]}\""
 for PCRNUM in ${PCRS[@]}; do
-	AWK_STR="\$1 ~ /${PCRNUM}/ { print \$2 }"
-	MEASUREMENTS=$(cat $SOURCE | awk "$AWK_STR")
-
-	#echo "awk str: $AWK_STR"
-	#echo "measurements: $MEASUREMENTS"
-
-	j=0
-	for m in $MEASUREMENTS; do
-		if [ $j -eq 0 ]; then
-			CURR_PCR=$(tpm-luks-chain-hashes -o $TMPFILE -h $m)
-		else
-			CURR_PCR=$(tpm-luks-chain-hashes -f $TMPFILE -o $TMPFILE -h $m)
-		fi
-
-		j=1
-	done
+	PCRNUM2=$(printf "%02d" $PCRNUM)
+	CURR_PCR=$( cat $TMPPCR | awk -F: "\$1 ~ /PCR-$PCRNUM2/ { print tolower(\$2) }" )
 
 	# Sitting in $TMPFILE is the binary hash value of $PCRNUM at the point in
 	# time where the BIOS launched the MBR.
@@ -208,5 +212,9 @@ for PCRNUM in ${PCRS[@]}; do
 		esac
 	fi
 done
+
+rm -f $TMPCFG
+rm -f $TMPPCR
+
 
 exit 0
