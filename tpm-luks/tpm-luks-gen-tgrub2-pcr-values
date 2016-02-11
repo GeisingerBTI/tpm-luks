@@ -1,0 +1,212 @@
+#!/bin/bash -e
+#
+# tpm-luks-gen-tgrub-pcr-values
+#
+# Parse a grub1 menu.lst file and generate the future TPM PCR values needed
+# to seal a system state to. Based on the implementation of the trustedgrub
+# package at http://trustedgrub.sf.net.
+#
+# Author: Kent Yoder <shpedoikal@gmail.com>
+#
+####
+# NVRAM permissions file format:
+#
+# [r/w] [PCR#] [40 byte ascii SHA-1 value]
+#
+# example:
+#
+# r 0 f952e49a7e90037fb6ee505d80a322798012db16
+# r 15 a0ea6036b734da48b57fdd0fd87218cbada887ef
+# w 12 3bd4ed7984d262f1d0d71e337ea4de290e17b4bd
+#
+# For this example, the TPM data written will only be readable when PCR 0's
+# value is f952e49a7e90037fb6ee505d80a322798012db16 and PCR 15's value is
+# a0ea6036b734da48b57fdd0fd87218cbada887ef and will only be writable when
+# PCR 12's value is 3bd4ed7984d262f1d0d71e337ea4de290e17b4bd.
+#
+####
+# How do you know which PCRs to use? The canonical reference document that
+# describes which PCRs are used for which purposes for TPM 1.2 is here:
+#
+# http://www.trustedcomputinggroup.org/files/temp/64505409-1D09-3519-AD5C611FAD3F799B/PC%20Client%20Implementation%20for%20BIOS.pdf
+#
+# See section 3.2.3. A summary for convenience:
+#
+# PCR Index	Use
+# 0		CRTM, BIOS, and Host Platform Extensions
+# 1		Host Platform Configuration
+# 2		Option ROM Code
+# 3		Option ROM Configuration and Data
+# 4		IPL Code (usually the MBR)
+# 5		IPL Code Configuration and Data
+# 6		State Transition and Wake Events
+# 7		Host Platform Manufacturer Control
+# 8-15		Used by the OS
+#
+# An explanation of the "srtm" profile (below):
+#
+# PCR 4  - record measurement of trusted grub in the MBR as measured by
+#          the BIOS
+# PCR 5  - record the IPL config - this is a record of the boot device
+#          chosen by the user
+# PCR 8  - First sector of TrustedGRUB2 kernel (diskboot.img)
+# PCR 9  - TrustedGRUB2 kernel (core.img)
+# PCR 10 - kernel/initrd used
+# PCR 11 - Command line used to boot the kernel
+# PCR 12 - luks header
+# PCR 13 - grub2-modules loaded dynamically
+#
+#
+PCRS="4 5 8 9 10 11"
+TMPFILE=
+BOOT_DIR=/boot
+BOOT_CFG=
+OUTFILE=/dev/stdout
+BOOT_DEV=/dev/sda
+
+if [ -z "${PCRS}" ]; then
+	exit 0
+elif [ ! -e ${SOURCE} ]; then
+	echo "PCR measurements file not found, is securityfs mounted?" 1>&2
+	exit 255
+fi
+
+function usage
+{
+	echo "usage ${0##/*} [options]"
+	echo "options:"
+	echo
+	echo "  -o <file>   Optional file to write NVRAM permissions files to (default is stdout)"
+	echo "  -d <device> Optional device to parse MBR and grub configurations (default is /dev/sda)"
+	echo "  -r <dir>    Optional root directory of the boot partition (default is /boot)"
+	echo "  -m <file>   Optional grub2.cfg file to parse (default is /boot/grub/grub.cfg, or /boot/grub2/grub.cfg if /boot/grub is nonexistent)"
+	echo "  -c          Use current PCRs instead of precalculated expected PCRs (DANGEROUS!)"
+	
+}
+
+CALC_PCR=1
+
+while getopts "o:d:r:m:c" opt; do
+	case $opt in
+	o)
+		OUTFILE=$OPTARG
+		;;
+    d)
+        BOOT_DEV=$OPTARG
+        ;;
+    r)
+        BOOT_DIR=$OPTARG
+        ;;
+    m)
+        BOOT_CFG=$OPTARG
+        ;;
+    c)
+        CALC_PCR=0
+        ;;
+	*)
+		usage
+		exit 255
+		;;
+	esac
+done
+
+if test -z "$BOOT_CFG"; then
+	BOOT_CFG=$BOOT_DIR/grub/grub.cfg
+	if test ! -f $BOOT_CFG; then
+		BOOT_CFG=$BOOT_DIR/grub2/grub.cfg
+	fi
+fi
+
+cleanup()
+{
+	rm -f $TMPFILE
+}
+
+TMPFILE=$(mktemp -q /tmp/${0##*/}-XXXXXX)
+TPMCFG=$(mktemp -q /tmp/${0##*/}-XXXXXX)
+
+if [ ! -n "$TMPFILE" ]; then
+	echo "Temp file creation failed" 1>&2
+	exit -1
+fi
+if [ ! -n "$TMPCFG" ]; then
+	rm -f $TMPFILE
+	echo "Temp file creation failed" 1>&2
+	exit -1
+fi
+
+
+trap cleanup EXIT
+
+grep -zPo 'menuentry [^{]*{[^}]*}' $BOOT_CFG | sed ':again;$!N;$!b again; s/}.*//' > $TMPCFG
+KERNEL="$BOOT_DIR/$(grep '^\Wlinux' $TMPCFG | awk '{print $2}')"
+INITRD="$BOOT_DIR/$(grep '^\Winitrd' $TMPCFG | awk '{print $2}')"
+
+#echo "Writing PCRs for \"$MENU\" boot entries:"
+	
+#echo -n "$e: \"${TITLES[$e]}\""
+for PCRNUM in ${PCRS[@]}; do
+	AWK_STR="\$1 ~ /${PCRNUM}/ { print \$2 }"
+	MEASUREMENTS=$(cat $SOURCE | awk "$AWK_STR")
+
+	#echo "awk str: $AWK_STR"
+	#echo "measurements: $MEASUREMENTS"
+
+	j=0
+	for m in $MEASUREMENTS; do
+		if [ $j -eq 0 ]; then
+			CURR_PCR=$(tpm-luks-chain-hashes -o $TMPFILE -h $m)
+		else
+			CURR_PCR=$(tpm-luks-chain-hashes -f $TMPFILE -o $TMPFILE -h $m)
+		fi
+
+		j=1
+	done
+
+	# Sitting in $TMPFILE is the binary hash value of $PCRNUM at the point in
+	# time where the BIOS launched the MBR.
+	#
+	# Using $TMPFILE as a starting point, continue the chaining process
+
+	# XXX TODO Checkfile support in PCR13
+	if $CALC_PCR -eq 0; then
+		echo "r $PCRNUM $CURR_PCR" >> ${OUTFILE}
+	else
+	
+		case $PCRNUM in
+		8)
+			rm ${TMPFILE}
+			dd if=${BOOT_DEV} of=${TMPFILE} bs=512 skip=1 count=1 >/dev/null 2>&1
+			CURR_PCR=$(tpm-luks-chain-hashes ${TMPFILE})
+			echo "r $PCRNUM $CURR_PCR" >> ${OUTFILE}
+			;;
+		9)
+			rm ${TMPFILE}
+			# get the size of the core.img file
+			CORE_SIZE=$(dd if=${BOOT_DEV} bs=1 skip=1020 count=2 2>/dev/null | hexdump -e '2/2 "%02d"')
+			dd if=${BOOT_DEV} of=${TMPFILE} bs=512 skip=2 count=$CORE_SIZE >/dev/null 2>&1
+		
+			CURR_PCR=$(tpm-luks-chain-hashes ${TMPFILE})
+			echo "r $PCRNUM $CURR_PCR" >> ${OUTFILE}
+			;;
+		10)
+			# OK, we're gonna get ugly here....
+			# the vmlinuz comes first (KERNEL), then the initramfs (INITRD)
+			
+			echo "r $PCRNUM $CURR_PCR" >> ${OUTFILE}
+			#echo "w $PCRNUM $CURR_PCR"
+			;;
+		11)
+			# and the ugliest of all ... the command string!
+			echo "r $PCRNUM $CURR_PCR" >> ${OUTFILE}
+			
+			#echo "w $PCRNUM $CURR_PCR"
+			;;
+		*)
+			echo "r $PCRNUM $CURR_PCR" >> ${OUTFILE}
+			;;
+		esac
+	fi
+done
+
+exit 0
