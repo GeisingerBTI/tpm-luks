@@ -10,6 +10,11 @@ AWK=/bin/awk
 CRYPTSETUP=/sbin/cryptsetup
 TPM_LUKS_NV_INDEX_LIMIT=128
 
+TPM_DEVICE=/sys/class/misc/tpm0
+if test $(uname -r | cut -d. -f1) -ge 3; then
+	TPM_DEVICE=/sys/class/tpm/tpm0
+fi
+
 DEVICE=
 TMPFS_MNT=/dev/shm
 TMPFS_KEYFILE=
@@ -35,6 +40,11 @@ OWNER_WRITE=1
 function prompt_for_new_nvpass
 {
 	if [ ${DEFINE_PASS} -eq 1 -a ${WRITE_PASS} -eq 1 ]; then
+		return
+	fi
+	
+	# If we're using the well-known secret, no need for a NV Password
+	if [ "${OWNERPASS}" = "-y" ]; then
 		return
 	fi
 
@@ -78,13 +88,13 @@ function wipe_file
 
 function tpm_enabled
 {
-	if [ ! -e /sys/class/misc/tpm0/device/enabled ]; then
+	if [ ! -e $TPM_DEVICE/device/enabled ]; then
 		echo "Your TPM device driver doesn't appear to be loaded. Please run"
 		echo "\`modprobe tpm_tis\` to load the driver and re-run this script"
 		exit 7
 	fi
 
-	if [ ! /sys/class/misc/tpm0/device/enabled ]; then
+	if [ ! $TPM_DEVICE/device/enabled ]; then
 		echo "Your TPM is not enabled in your BIOS. Please halt the machine and"
 		echo "then cold boot into your BIOS to enable the TPM chip."
 		exit 8
@@ -95,9 +105,13 @@ function tpm_enabled
 
 function tpm_owned
 {
-	if [ $(cat /sys/class/misc/tpm0/device/owned) -ne 1 ]; then
+	if [ $(cat $TPM_DEVICE/device/owned) -ne 1 ]; then
 		echo "Your TPM is unowned, please take ownership:"
-		tpm_takeownership || exit 9
+		OWNERSHIP_OPTS=""
+		if [ "$OWNERPASS" = "-y" ]; then
+			OWNERSHIP_OPTS="-y -z"
+		fi
+		tpm_takeownership $OWNERSHIP_OPTS || exit 9
 	fi
 
 	return 0
@@ -193,7 +207,8 @@ function nv_define_and_write
 	DATAFILE=${TMPFS_KEYFILE}
 	NVPASS_OPTION=
 	OWNERPASS_OPTION="-y"
-	WRITEPASS_OPTION=
+	WRITEPASS_OPTION="-z"
+	NVPASS_OPTION="-z"
 
 	get_owner_password
 
@@ -224,13 +239,13 @@ function nv_define_and_write
 	# if there's a password required for writing the NV area, determine if its the
 	# owner password, or the NV area password
 	if [ ${OWNER_WRITE} -eq 0 ]; then
-		if [ "${OWNERPASS}" == "-y" ]; then
-			WRITEPASS_OPTION="-z"
-		else
+		if [ "${OWNERPASS}" != "-y" ]; then
 			WRITEPASS_OPTION="--password=${OWNERPASS}"
 		fi
 	elif [ ${WRITE_PASS} -eq 0 ]; then
-		WRITEPASS_OPTION="--password=${NVPASS}"
+		if [ "${OWNERPASS}" != "-y" ]; then
+			WRITEPASS_OPTION="--password=${NVPASS}"
+		fi
 	fi
 
 	tpm_nvwrite -i ${NVINDEX} -s ${KEYFILE_SIZE} -f ${DATAFILE} ${WRITEPASS_OPTION}
@@ -366,7 +381,7 @@ function usage
 	echo -e "                     is /dev/urandom"
 	echo -e	"  -y                use the well known secret (all zeroes) as the owner password."
 	echo -e "                     This will apply both to the NV define and NV write operations"
-	echo -e "                     if they apply, as well as NV read."
+	echo -e "                     if they apply, as well as NV read."	
 	echo -e	"  -h                help"
 }
 
@@ -431,6 +446,8 @@ while getopts "kcao:mrw:l:s:i:d:p:P:q:yh" opt; do
 	y)
 		OWNERPASS="-y"
 		;;
+	z)
+	    
 	*)
 		usage
 		exit 255
