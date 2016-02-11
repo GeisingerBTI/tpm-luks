@@ -1,7 +1,7 @@
 %define dracutlibdir %{_prefix}/lib/dracut
 
 %define dracut_mod_name 90crypt-tpm
-%if 0%{?rhel} >= 6
+%if 0%{?rhel} <= 6
 %define dracut_mod_name 50plymouth-tpm
 %endif
 
