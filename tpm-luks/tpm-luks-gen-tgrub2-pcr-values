@@ -57,6 +57,9 @@
 # PCR 13 - grub2-modules loaded dynamically
 #
 #
+
+set -x
+
 PCRS="4 5 8 9 10 11"
 TMPFILE=
 BOOT_DIR=/boot
@@ -127,6 +130,8 @@ fi
 cleanup()
 {
 	rm -f $TMPFILE
+	rm -f $TMPCFG
+	rm -f $TMPPCR
 }
 
 TMPFILE=$(mktemp -q /tmp/${0##*/}-XXXXXX)
@@ -152,9 +157,6 @@ fi
 trap cleanup EXIT
 
 cat $PCR_SOURCE | sed "s/ //g" > $TMPPCR
-for PCRNUM in $PCRS; do
-
-done
 
 grep -zPo 'menuentry [^{]*{[^}]*}' $BOOT_CFG | sed ':again;$!N;$!b again; s/}.*//' > $TMPCFG
 KERNEL="${BOOT_DIR}$(grep '^\Wlinux' $TMPCFG | awk '{print $2}')"
@@ -173,7 +175,7 @@ for PCRNUM in ${PCRS[@]}; do
 	# Using $TMPFILE as a starting point, continue the chaining process
 
 	# XXX TODO Checkfile support in PCR13
-	if $CALC_PCR -eq 0; then
+	if test $CALC_PCR -eq 0; then
 		echo "r $PCRNUM $CURR_PCR" >> ${OUTFILE}
 	else
 	
@@ -213,8 +215,6 @@ for PCRNUM in ${PCRS[@]}; do
 	fi
 done
 
-rm -f $TMPCFG
-rm -f $TMPPCR
 
 
 exit 0
