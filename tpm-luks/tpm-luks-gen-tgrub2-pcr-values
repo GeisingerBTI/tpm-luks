@@ -51,16 +51,16 @@
 #          chosen by the user
 # PCR 8  - First sector of TrustedGRUB2 kernel (diskboot.img)
 # PCR 9  - TrustedGRUB2 kernel (core.img)
-# PCR 10 - kernel/initrd used
+# PCR 14 - kernel/initrd used (NOTE: change from base, to avoid linux IMA)
 # PCR 11 - Command line used to boot the kernel
 # PCR 12 - luks header
 # PCR 13 - grub2-modules loaded dynamically
 #
 #
 
-set -x
+#set -x
 
-PCRS="4 5 8 9 10 11"
+PCRS="4 5 8 9 10 14"
 TMPFILE=
 BOOT_DIR=/boot
 BOOT_CFG=
@@ -184,7 +184,7 @@ for PCRNUM in ${PCRS[@]}; do
 			rm ${TMPFILE}
 			dd if=${BOOT_DEV} of=${TMPFILE} bs=512 skip=1 count=1 >/dev/null 2>&1
 			CURR_PCR=$(tpm-luks-chain-hashes ${TMPFILE})
-			echo "r $PCRNUM $CURR_PCR" >> ${OUTFILE}
+			echo "$PCRNUM $CURR_PCR" >> ${OUTFILE}
 			;;
 		9)
 			rm ${TMPFILE}
@@ -193,25 +193,25 @@ for PCRNUM in ${PCRS[@]}; do
 			dd if=${BOOT_DEV} of=${TMPFILE} bs=512 skip=2 count=$CORE_SIZE >/dev/null 2>&1
 		
 			CURR_PCR=$(tpm-luks-chain-hashes ${TMPFILE})
-			echo "r $PCRNUM $CURR_PCR" >> ${OUTFILE}
+			echo "$PCRNUM $CURR_PCR" >> ${OUTFILE}
 			;;
-		10)
+		14)
 			# OK, we're gonna get ugly here....
 			# the vmlinuz comes first (KERNEL), then the initramfs (INITRD)
-			tpm-luks-chain-hashes -o ${TMPFILE} $KERNEL
-			CURR_PCR_BAD=$(tpm-luks-chain-hashes -o ${TMPFILE} -h ${TMPFILE} $INITRD)
+			tpm-luks-chain-hashes -o ${TMPFILE} $KERNEL >/dev/null
+			CURR_PCR=$(tpm-luks-chain-hashes -o ${TMPFILE} -h ${TMPFILE} $INITRD)
 			
-			echo "r $PCRNUM $CURR_PCR" >> ${OUTFILE}
+			echo "$PCRNUM $CURR_PCR" >> ${OUTFILE}
 			#echo "w $PCRNUM $CURR_PCR"
 			;;
 		11)
 			# and the ugliest of all ... the command string!
-			echo "r $PCRNUM $CURR_PCR" >> ${OUTFILE}
+			echo "$PCRNUM $CURR_PCR" >> ${OUTFILE}
 			
 			#echo "w $PCRNUM $CURR_PCR"
 			;;
 		*)
-			echo "r $PCRNUM $CURR_PCR" >> ${OUTFILE}
+			echo "$PCRNUM $CURR_PCR" >> ${OUTFILE}
 			;;
 		esac
 	fi
