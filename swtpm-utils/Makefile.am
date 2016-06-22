@@ -51,10 +51,11 @@ AM_LDFLAGS = -lc -ldl -lcrypto
 # scripts as part of bnuilding the initramfs. The 'inst_binary' script
 # only looks in a few places, and /usr/local/bin isn't one of them
 bindir=/usr/bin
-bin_PROGRAMS = getcapability nv_readvalue
+bin_PROGRAMS = getcapability nv_readvalue tpm_unseal
 
 getcapability_SOURCES = getcapability.c
 nv_readvalue_SOURCES = nv_readvalue.c
+tpm_unseal_SOURCES = tpm_unseal.c
 
 noinst_HEADERS = \
 	include/hmac.h \
