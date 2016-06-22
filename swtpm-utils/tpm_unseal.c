@@ -196,7 +196,7 @@ int tpmUnsealFile( char* fname, unsigned char** tss_data, int* tss_size,
 	//TSS_HENCDATA hEncdata;
 	//TSS_HKEY hSrk, hKey;
 	//TSS_HPOLICY hPolicy;
-	uint32_t  = 0;
+	uint32_t symKeyLen = 0;
 	BYTE *symKey = 0;
 	BYTE srkauth[TPM_HASH_SIZE] = {0};
 	BYTE dataauth[TPM_HASH_SIZE];
