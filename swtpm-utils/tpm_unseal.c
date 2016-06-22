@@ -426,7 +426,7 @@ int tpmUnsealFile( char* fname, unsigned char** tss_data, int* tss_size,
 	symKey = malloc(evpLen);
 
 	/* unseal using the SRK */
-	if ((rc=TPM_Unseal(0x40000000, srkauth, dataauth, evpKeyData, evpLen, symKey, &)) != 0){
+	if ((rc=TPM_Unseal(0x40000000, srkauth, dataauth, evpKeyData, evpLen, symKey, &symKeyLen)) != 0){
 		tpm_errno = TPMSEAL_STD_ERROR;
 		goto tss_out;
 	}
