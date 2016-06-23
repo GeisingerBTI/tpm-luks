@@ -444,7 +444,7 @@ int tpmUnsealFile( char* fname, unsigned char** tss_data, int* tss_size,
 	}
 
 	// First, decode the "TSS KEY" using the SRK
-	if((rc=TPM_LoadKey2(0x04000000, srkauth, (keydata*) tssKeyData, &hKey)) != 0){
+	if((rc=TPM_LoadKey2(0x40000000, srkauth, (keydata*) tssKeyData, &hKey)) != 0){
 		tpm_errno = TPMSEAL_STD_ERROR;
 		goto tss_out;
 	}
@@ -615,7 +615,8 @@ out:
 	if (srkSecret)
 		tpmUnsealShred((unsigned char *) srkSecret, strlen(srkSecret));
 
-	tpmUnsealShred(symKey, sizeof(symKey));
+	if(symKeyLen)
+		tpmUnsealShred(symKey, symKeyLen);
 
 	if ( bdata )
 		BIO_free(bdata);
