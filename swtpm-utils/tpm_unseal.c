@@ -65,7 +65,7 @@ int tpm_errno;
 
 int tpmUnsealFile(char*, unsigned char**, int*, int);
 
-int unpackKey(BYTE*, unsigned int, keydata*);
+int unpackKey(const BYTE*, unsigned int, keydata*);
 
 // shredding functions
 void tpmUnsealShred(unsigned char*, int);
@@ -75,17 +75,17 @@ void shredPasswd(char*);
 int hashPassword(const char*, size_t, BYTE*);
 char *_getPasswd(const char *, int*, int);
 
-uint16_t decode_uint16(BYTE*);
-uint32_t decode_uint32(BYTE*);
+uint16_t decode_uint16(const BYTE*);
+uint32_t decode_uint32(const BYTE*);
 
-uint16_t decode_uint16(BYTE* in){
+uint16_t decode_uint16(const BYTE* in){
     uint16_t temp = 0;
     temp = (in[1] & 0xFF);
     temp |= (in[0] << 8);
     return temp;
 }
 
-uint32_t decode_uint32(BYTE* y){
+uint32_t decode_uint32(const BYTE* y){
     uint32_t x = 0;
 
     x = y[0];
@@ -96,7 +96,7 @@ uint32_t decode_uint32(BYTE* y){
     return x;
 }
 
-int unpackKey(BYTE* keyblob, unsigned int blobsz, keydata* key_out){
+int unpackKey(const BYTE* keyblob, unsigned int blobsz, keydata* key_out){
 	unsigned int offset = 0;
 	unsigned int suboffset = 0;
 	uint32_t size;
@@ -133,7 +133,7 @@ int unpackKey(BYTE* keyblob, unsigned int blobsz, keydata* key_out){
 	suboffset += sizeof(uint32_t);
 	key_out->pub.algorithmParms.u.rsaKeyParms.exponentSize = decode_uint32(&keyblob[offset + suboffset]);
 	suboffset += sizeof(uint32_t);
-	memcpy(&keyblob[offset+suboffset],key_out->pub.algorithmParms.u.rsaKeyParms.exponent,key_out->pub.algorithmParms.u.rsaKeyParms.exponentSize);
+	memcpy(key_out->pub.algorithmParms.u.rsaKeyParms.exponent,&keyblob[offset+suboffset],key_out->pub.algorithmParms.u.rsaKeyParms.exponentSize);
 	suboffset += key_out->pub.algorithmParms.u.rsaKeyParms.exponentSize;
 
 	// we really should check that suboffset == size here
@@ -142,19 +142,19 @@ int unpackKey(BYTE* keyblob, unsigned int blobsz, keydata* key_out){
 	// now, the PCR info
 	key_out->pub.pcrInfo.size = decode_uint32(&keyblob[offset]);
 	offset += sizeof(uint32_t);
-	memcpy(&keyblob[offset], key_out->pub.pcrInfo.buffer, key_out->pub.pcrInfo.size);
+	memcpy(key_out->pub.pcrInfo.buffer, &keyblob[offset],  key_out->pub.pcrInfo.size);
 	offset += key_out->pub.pcrInfo.size;
 
 	// The public key
 	key_out->pub.pubKey.keyLength = decode_uint32(&keyblob[offset]);
 	offset += sizeof(uint32_t);
-	memcpy(&keyblob[offset],key_out->pub.pubKey.modulus, key_out->pub.pubKey.keyLength);
+	memcpy(key_out->pub.pubKey.modulus, &keyblob[offset], key_out->pub.pubKey.keyLength);
 	offset += key_out->pub.pubKey.keyLength;
 
 	// The encoded private key
 	key_out->encData.size = decode_uint32(&keyblob[offset]);
 	offset += sizeof(uint32_t);
-	memcpy(&keyblob[offset],key_out->encData.buffer,key_out->encData.size);
+	memcpy(key_out->encData.buffer,&keyblob[offset],key_out->encData.size);
 	offset += key_out->encData.size;
 
 	// We also should REALLY check that offset == blobsz here!
@@ -534,7 +534,7 @@ int tpmUnsealFile( char* fname, unsigned char** tss_data, int* tss_size,
 	}
 
 	// OK, let's unpack that encoded TSS key
-	unpackKey(tssKeyData, tssKeyDataSize, &tss_key);
+	unpackKey(tssKeyData, tssLen, &tss_key);
 
 	// First, decode the "TSS KEY" using the SRK
 	if((rc=TPM_LoadKey2(0x40000000, srkauth, &tss_key, &hKey)) != 0){
