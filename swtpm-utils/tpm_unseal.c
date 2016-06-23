@@ -75,27 +75,6 @@ void shredPasswd(char*);
 int hashPassword(const char*, size_t, BYTE*);
 char *_getPasswd(const char *, int*, int);
 
-uint16_t decode_uint16(const BYTE*);
-uint32_t decode_uint32(const BYTE*);
-
-uint16_t decode_uint16(const BYTE* in){
-    uint16_t temp = 0;
-    temp = (in[1] & 0xFF);
-    temp |= (in[0] << 8);
-    return temp;
-}
-
-uint32_t decode_uint32(const BYTE* y){
-    uint32_t x = 0;
-
-    x = y[0];
-    x = ((x << 8) | (y[1] & 0xFF));
-    x = ((x << 8) | (y[2] & 0xFF));
-    x = ((x << 8) | (y[3] & 0xFF));
-
-    return x;
-}
-
 int unpackKey(const BYTE* keyblob, unsigned int blobsz, keydata* key_out){
 	unsigned int offset = 0;
 	unsigned int suboffset = 0;
@@ -108,30 +87,32 @@ int unpackKey(const BYTE* keyblob, unsigned int blobsz, keydata* key_out){
 	key_out->v.ver.revMajor = keyblob[offset++];
 	key_out->v.ver.revMinor = keyblob[offset++];
 
-	key_out->keyUsage = decode_uint16(&keyblob[offset]);
+	key_out->keyUsage = LOAD16(keyblob,offset);
 	offset += sizeof(uint16_t);
 
-	key_out->keyFlags = decode_uint32(&keyblob[offset]);
+	key_out->keyFlags = LOAD32(keyblob,offset);
 	offset += sizeof(uint32_t);
 
 	key_out->authDataUsage = keyblob[offset++];
+	// OVERRIDE!! no auth needed!
+	key_out->authDataUsage = 0;
 
-	key_out->pub.algorithmParms.algorithmID = decode_uint32(&keyblob[offset]);
+	key_out->pub.algorithmParms.algorithmID = LOAD32(keyblob, offset);
 	offset += sizeof(uint32_t);
-	key_out->pub.algorithmParms.encScheme = decode_uint16(&keyblob[offset]);
+	key_out->pub.algorithmParms.encScheme = LOAD16(keyblob, offset);
 	offset += sizeof(uint16_t);
-	key_out->pub.algorithmParms.sigScheme = decode_uint16(&keyblob[offset]);
+	key_out->pub.algorithmParms.sigScheme = LOAD16(keyblob, offset);
 	offset += sizeof(uint16_t);
 
 	// we need to get the size of the key parameters
-	size = decode_uint32(&keyblob[offset]);
+	size = LOAD32(keyblob,offset);
 	offset += sizeof(uint32_t);
 
-	key_out->pub.algorithmParms.u.rsaKeyParms.keyLength = decode_uint32(&keyblob[offset + suboffset]);
+	key_out->pub.algorithmParms.u.rsaKeyParms.keyLength = LOAD32(keyblob,offset + suboffset);
 	suboffset += sizeof(uint32_t);
-	key_out->pub.algorithmParms.u.rsaKeyParms.numPrimes = decode_uint32(&keyblob[offset + suboffset]);
+	key_out->pub.algorithmParms.u.rsaKeyParms.numPrimes = LOAD32(keyblob,offset + suboffset);
 	suboffset += sizeof(uint32_t);
-	key_out->pub.algorithmParms.u.rsaKeyParms.exponentSize = decode_uint32(&keyblob[offset + suboffset]);
+	key_out->pub.algorithmParms.u.rsaKeyParms.exponentSize = LOAD32(keyblob,offset + suboffset);
 	suboffset += sizeof(uint32_t);
 	memcpy(key_out->pub.algorithmParms.u.rsaKeyParms.exponent,&keyblob[offset+suboffset],key_out->pub.algorithmParms.u.rsaKeyParms.exponentSize);
 	suboffset += key_out->pub.algorithmParms.u.rsaKeyParms.exponentSize;
@@ -140,19 +121,19 @@ int unpackKey(const BYTE* keyblob, unsigned int blobsz, keydata* key_out){
 	offset += size;
 
 	// now, the PCR info
-	key_out->pub.pcrInfo.size = decode_uint32(&keyblob[offset]);
+	key_out->pub.pcrInfo.size = LOAD32(keyblob,offset);
 	offset += sizeof(uint32_t);
 	memcpy(key_out->pub.pcrInfo.buffer, &keyblob[offset],  key_out->pub.pcrInfo.size);
 	offset += key_out->pub.pcrInfo.size;
 
 	// The public key
-	key_out->pub.pubKey.keyLength = decode_uint32(&keyblob[offset]);
+	key_out->pub.pubKey.keyLength = LOAD32(keyblob, offset);
 	offset += sizeof(uint32_t);
 	memcpy(key_out->pub.pubKey.modulus, &keyblob[offset], key_out->pub.pubKey.keyLength);
 	offset += key_out->pub.pubKey.keyLength;
 
 	// The encoded private key
-	key_out->encData.size = decode_uint32(&keyblob[offset]);
+	key_out->encData.size = LOAD32(keyblob,offset);
 	offset += sizeof(uint32_t);
 	memcpy(key_out->encData.buffer,&keyblob[offset],key_out->encData.size);
 	offset += key_out->encData.size;
