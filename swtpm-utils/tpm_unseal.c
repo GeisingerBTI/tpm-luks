@@ -66,9 +66,14 @@ enum tpm_errors {
 int tpm_errno;
 
 int tpmUnsealFile(char*, unsigned char**, int*, int);
-void tpmUnsealShred(unsigned char*, int);
 
+// shredding functions
+void tpmUnsealShred(unsigned char*, int);
+void shredPasswd(char*);
+
+// get and hash passwords
 int hashPassword(const char*, size_t, BYTE*);
+char *_getPasswd(const char *, int*, int);
 
 void shredPasswd(char* passwd){
 	tpmUnsealShred((unsigned char*) passwd, strlen(passwd));
@@ -188,23 +193,39 @@ int tpmUnsealFile( char* fname, unsigned char** tss_data, int* tss_size,
 	int rc, rcLen=0, tssLen=0, evpLen=0;
 	BYTE* rcPtr;
 	char data[EVP_CIPHER_block_size(EVP_aes_256_cbc()) * 16];
+
+	// Encoded "TSS KEY" section
 	BYTE *tssKeyData = NULL;
 	int tssKeyDataSize = 0;
+
+	// Encoded "ENC KEY" section
 	BYTE *evpKeyData = NULL;
 	int evpKeyDataSize = 0;
 	struct stat stats;
-	//TSS_HENCDATA hEncdata;
-	//TSS_HKEY hSrk, hKey;
-	//TSS_HPOLICY hPolicy;
+
+	// The handle for the key provided in the "TSS Key" section
+	uint32_t hKey;
+
+	// this DARN well better be a AES-256 key size!
 	uint32_t symKeyLen = 0;
-	BYTE *symKey = 0;
-	BYTE srkauth[TPM_HASH_SIZE] = {0};
+	BYTE symKey[EVP_CIPHER_key_length(EVP_aes_256_cbc())];
+
+	// start the SRK auth with the TSS Well-known secret
+	BYTE srkauth[TPM_HASH_SIZE] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, \
+	         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
+	// The datauth will be the hash of "password" - original, amirite?
 	BYTE dataauth[TPM_HASH_SIZE];
+
+	// If necessary, the SRK password will go here
 	char *srkSecret = NULL;
 	int srkSecretLen;
+
+	// The resulting unencryped, unsealed data
 	unsigned char* res_data = NULL;
 	int res_size = 0;
 
+	// helpers to read base-64 data
 	BIO *bdata = NULL, *b64 = NULL, *bmem = NULL;
 	int bioRc = 0;
 
@@ -422,11 +443,14 @@ int tpmUnsealFile( char* fname, unsigned char** tss_data, int* tss_size,
 		}
 	}
 
-	/* allocate some memory for the raw data */
-	symKey = malloc(evpLen);
+	// First, decode the "TSS KEY" using the SRK
+	if((rc=TPM_LoadKey2(0x04000000, srkauth, (keydata*) tssKeyData, &hKey)) != 0){
+		tpm_errno = TPMSEAL_STD_ERROR;
+		goto tss_out;
+	}
 
-	/* unseal using the SRK */
-	if ((rc=TPM_Unseal(0x40000000, srkauth, dataauth, evpKeyData, evpLen, symKey, &symKeyLen)) != 0){
+	/* unseal the "ENC KEY" using the loaded key from above*/
+	if ((rc=TPM_Unseal(hKey, NULL, dataauth, evpKeyData, evpLen, symKey, &symKeyLen)) != 0){
 		tpm_errno = TPMSEAL_STD_ERROR;
 		goto tss_out;
 	}
@@ -591,8 +615,7 @@ out:
 	if (srkSecret)
 		tpmUnsealShred((unsigned char *) srkSecret, strlen(srkSecret));
 
-	if(symKey)
-		tpmUnsealShred(symKey, evpLen);
+	tpmUnsealShred(symKey, sizeof(symKey));
 
 	if ( bdata )
 		BIO_free(bdata);
