@@ -32,8 +32,6 @@
 #include <unistd.h>
 #include <openssl/evp.h>
 #include <getopt.h>
-//#include <trousers/tss.h>
-//#include <trousers/trousers.h>
 
 // From tpm_seal.h
 #define TPMSEAL_HDR_STRING "-----BEGIN TSS-----\n"
@@ -67,6 +65,8 @@ int tpm_errno;
 
 int tpmUnsealFile(char*, unsigned char**, int*, int);
 
+int unpackKey(BYTE*, unsigned int, keydata*);
+
 // shredding functions
 void tpmUnsealShred(unsigned char*, int);
 void shredPasswd(char*);
@@ -74,6 +74,93 @@ void shredPasswd(char*);
 // get and hash passwords
 int hashPassword(const char*, size_t, BYTE*);
 char *_getPasswd(const char *, int*, int);
+
+uint16_t decode_uint16(BYTE*);
+uint32_t decode_uint32(BYTE*);
+
+uint16_t decode_uint16(BYTE* in){
+    uint16_t temp = 0;
+    temp = (in[1] & 0xFF);
+    temp |= (in[0] << 8);
+    return temp;
+}
+
+uint32_t decode_uint32(BYTE* y){
+    uint32_t x = 0;
+
+    x = y[0];
+    x = ((x << 8) | (y[1] & 0xFF));
+    x = ((x << 8) | (y[2] & 0xFF));
+    x = ((x << 8) | (y[3] & 0xFF));
+
+    return x;
+}
+
+int unpackKey(BYTE* keyblob, unsigned int blobsz, keydata* key_out){
+	unsigned int offset = 0;
+	unsigned int suboffset = 0;
+	uint32_t size;
+
+	int rc=0;
+
+	key_out->v.ver.major = keyblob[offset++];
+	key_out->v.ver.minor = keyblob[offset++];
+	key_out->v.ver.revMajor = keyblob[offset++];
+	key_out->v.ver.revMinor = keyblob[offset++];
+
+	key_out->keyUsage = decode_uint16(&keyblob[offset]);
+	offset += sizeof(uint16_t);
+
+	key_out->keyFlags = decode_uint32(&keyblob[offset]);
+	offset += sizeof(uint32_t);
+
+	key_out->authDataUsage = keyblob[offset++];
+
+	key_out->pub.algorithmParms.algorithmID = decode_uint32(&keyblob[offset]);
+	offset += sizeof(uint32_t);
+	key_out->pub.algorithmParms.encScheme = decode_uint16(&keyblob[offset]);
+	offset += sizeof(uint16_t);
+	key_out->pub.algorithmParms.sigScheme = decode_uint16(&keyblob[offset]);
+	offset += sizeof(uint16_t);
+
+	// we need to get the size of the key parameters
+	size = decode_uint32(&keyblob[offset]);
+	offset += sizeof(uint32_t);
+
+	key_out->pub.algorithmParms.u.rsaKeyParms.keyLength = decode_uint32(&keyblob[offset + suboffset]);
+	suboffset += sizeof(uint32_t);
+	key_out->pub.algorithmParms.u.rsaKeyParms.numPrimes = decode_uint32(&keyblob[offset + suboffset]);
+	suboffset += sizeof(uint32_t);
+	key_out->pub.algorithmParms.u.rsaKeyParms.exponentSize = decode_uint32(&keyblob[offset + suboffset]);
+	suboffset += sizeof(uint32_t);
+	memcpy(&keyblob[offset+suboffset],key_out->pub.algorithmParms.u.rsaKeyParms.exponent,key_out->pub.algorithmParms.u.rsaKeyParms.exponentSize);
+	suboffset += key_out->pub.algorithmParms.u.rsaKeyParms.exponentSize;
+
+	// we really should check that suboffset == size here
+	offset += size;
+
+	// now, the PCR info
+	key_out->pub.pcrInfo.size = decode_uint32(&keyblob[offset]);
+	offset += sizeof(uint32_t);
+	memcpy(&keyblob[offset], key_out->pub.pcrInfo.buffer, key_out->pub.pcrInfo.size);
+	offset += key_out->pub.pcrInfo.size;
+
+	// The public key
+	key_out->pub.pubKey.keyLength = decode_uint32(&keyblob[offset]);
+	offset += sizeof(uint32_t);
+	memcpy(&keyblob[offset],key_out->pub.pubKey.modulus, key_out->pub.pubKey.keyLength);
+	offset += key_out->pub.pubKey.keyLength;
+
+	// The encoded private key
+	key_out->encData.size = decode_uint32(&keyblob[offset]);
+	offset += sizeof(uint32_t);
+	memcpy(&keyblob[offset],key_out->encData.buffer,key_out->encData.size);
+	offset += key_out->encData.size;
+
+	// We also should REALLY check that offset == blobsz here!
+
+	return rc;
+}
 
 void shredPasswd(char* passwd){
 	tpmUnsealShred((unsigned char*) passwd, strlen(passwd));
@@ -197,6 +284,9 @@ int tpmUnsealFile( char* fname, unsigned char** tss_data, int* tss_size,
 	// Encoded "TSS KEY" section
 	BYTE *tssKeyData = NULL;
 	int tssKeyDataSize = 0;
+
+	// unpacked TSS Key, ready to be loaded into the TPM
+	keydata tss_key;
 
 	// Encoded "ENC KEY" section
 	BYTE *evpKeyData = NULL;
@@ -443,8 +533,11 @@ int tpmUnsealFile( char* fname, unsigned char** tss_data, int* tss_size,
 		}
 	}
 
+	// OK, let's unpack that encoded TSS key
+	unpackKey(tssKeyData, tssKeyDataSize, &tss_key);
+
 	// First, decode the "TSS KEY" using the SRK
-	if((rc=TPM_LoadKey2(0x40000000, srkauth, (keydata*) tssKeyData, &hKey)) != 0){
+	if((rc=TPM_LoadKey2(0x40000000, srkauth, &tss_key, &hKey)) != 0){
 		tpm_errno = TPMSEAL_STD_ERROR;
 		goto tss_out;
 	}
