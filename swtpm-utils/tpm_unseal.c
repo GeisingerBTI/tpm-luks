@@ -796,7 +796,11 @@ int main(int argc, char **argv)
 		}
 	}
 	
-	rc = tpmUnsealFile(in_filename, &tss_data, &tss_size, srkWellKnown);
+	if( (rc = tpmUnsealFile(in_filename, &tss_data, &tss_size, srkWellKnown))!= 0){
+		fprintf(stderr, "Unable to unseal data\n");
+		goto out;
+	}
+
 
 	if (strlen(out_filename) == 0) {
 		for (i=0; i < tss_size; i++)
