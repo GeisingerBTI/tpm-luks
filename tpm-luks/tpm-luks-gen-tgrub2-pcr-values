@@ -60,7 +60,7 @@
 
 #set -x
 
-PCRS="4 5 8 9 10 14"
+PCRS="4 5 8 9 11 14"
 TMPFILE=
 BOOT_DIR=/boot
 BOOT_CFG=
@@ -197,18 +197,15 @@ for PCRNUM in ${PCRS[@]}; do
 			;;
 		14)
 			# OK, we're gonna get ugly here....
-			# the vmlinuz comes first (KERNEL), then the initramfs (INITRD)
-			tpm-luks-chain-hashes -o ${TMPFILE} $KERNEL >/dev/null
-			CURR_PCR=$(tpm-luks-chain-hashes -o ${TMPFILE} -h ${TMPFILE} $INITRD)
+			# the vmlinuz comes first (KERNEL), then the initramfs (INITRD)i
+			CURR_PCR=$(tpm-luks-chain-hashes $KERNEL $INITRD)
 			
 			echo "$PCRNUM $CURR_PCR" >> ${OUTFILE}
-			#echo "w $PCRNUM $CURR_PCR"
 			;;
 		11)
 			# and the ugliest of all ... the command string!
 			echo "$PCRNUM $CURR_PCR" >> ${OUTFILE}
 			
-			#echo "w $PCRNUM $CURR_PCR"
 			;;
 		*)
 			echo "$PCRNUM $CURR_PCR" >> ${OUTFILE}
