@@ -708,6 +708,7 @@ int TSS_parsebuff(char *format,const struct tpm_buffer *tb, uint32_t start,...)
 /****************************************************************************/
 void showBuff(unsigned char* buff, char* string)
 {
+#ifdef DEBUG
     uint32_t i,len;
     uint32_t addsize = 0;
     if (use_vtpm) {
@@ -727,6 +728,7 @@ void showBuff(unsigned char* buff, char* string)
 	    printf("%.2X ",buff[i]);
 	}
     printf("\n");
+#endif
 }
 
 
@@ -752,7 +754,9 @@ uint32_t TPM_Send(struct tpm_buffer *tb,const char *msg) {
 	    rc = use_transp->open(&sock_fd);
 	}
 	if (rc == 0) {
+#ifdef DEBUG
 	    if (logflag) printf("TPM_Send: %s\n", msg);
+#endif
 	    rc = use_transp->send(sock_fd, tb, msg);
 	}
 	if (rc == 0) {
