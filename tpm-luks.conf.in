@@ -6,14 +6,13 @@
 #
 # device - a LUKS partition
 #
-# index - A TPM NVRAM index used to store the LUKS secret. You can list
-#	  NVRAM indexes with tpm_nvinfo.
+# index - A file to store a sealed key for the device
 #
 # script - full path to a script that produces a TPM NVRAM permissions file,
-#	   as used by tpm_nvdefine -f. See tpm-luks-gen-tgrub-pcr-values
+#	   as used by tpm_sealdata -f. See tpm-luks-gen-tgrub2-pcr-values
 #	   for info on the format of the script file.
 #
 # example:
 #
-#/dev/sda2:2:@sbindir@/tpm-luks-gen-tgrub2-pcr-values
+#/dev/sda2:/boot/.key:@sbindir@/tpm-luks-gen-tgrub2-pcr-values
 #

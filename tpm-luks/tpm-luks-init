@@ -16,14 +16,14 @@ function cleanup
 trap cleanup EXIT
 
 DEVICES=( $(cat ${CONF} | awk -F: '! /^#/ {print $1}') )
-INDEXES=( $(cat ${CONF} | awk -F: '! /^#/ {print $2}') )
+KEYFILES=( $(cat ${CONF} | awk -F: '! /^#/ {print $2}') )
 SCRIPTS=( $(cat ${CONF} | awk -F: '! /^#/ {print $3}') )
 
 NUM_DEVICES=$(( ${#DEVICES[@]} - 1 ))
-NUM_INDEXES=$(( ${#INDEXES[@]} - 1 ))
+NUM_KEYS=$(( ${#INDEXES[@]} - 1 ))
 NUM_SCRIPTS=$(( ${#SCRIPTS[@]} - 1 ))
 
-if [ $NUM_SCRIPTS -ne $NUM_DEVICES -o $NUM_DEVICES -ne $NUM_INDEXES ]; then
+if [ $NUM_SCRIPTS -ne $NUM_DEVICES -o $NUM_DEVICES -ne $NUM_KEYS ]; then
 	echo "${CONF} parse error" 1>&2
 	exit 1
 fi
@@ -37,7 +37,7 @@ for d in $(seq 0 $NUM_DEVICES); do
 	fi
 
 	echo "Creating new TPM NVRAM secret for ${DEVICES[$d]}..."
-	tpm-luks -c -d ${DEVICES[$d]} -i ${INDEXES[$d]} -p ${NVPERMSFILE}
+	tpm-luks -c -d ${DEVICES[$d]} -k ${KEYFILES[$d]} -f ${NVPERMSFILE}
 	if [ $? -ne 0 ]; then
 		echo "tpm-luks has failed. Aborting."
 		exit 3
