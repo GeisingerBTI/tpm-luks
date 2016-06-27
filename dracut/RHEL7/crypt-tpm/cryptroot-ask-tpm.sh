@@ -4,6 +4,9 @@
 #
 # Author: Kent Yoder <shpedoikal@gmail.com>
 #
+
+set -x
+
 PATH=/usr/sbin:/usr/bin:/sbin:/bin
 . /lib/dracut-crypt-lib.sh
 
