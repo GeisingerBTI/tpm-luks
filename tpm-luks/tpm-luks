@@ -95,11 +95,11 @@ function device_get
 function keyfile_generate
 {
 	TMPFS_KEYFILE=${TMPFS_MNT}/key
+	echo "Created: $TMPFS_KEYFILE"
 	
 	# let's secure the keyfile to only our user (which is probably root)
 	touch $TMPFS_KEYFILE
-	chmod a-rwx $TMPFS_KEYFILE
-	chmod u+rw $TMPFS_KEYFILE
+	chmod go-rwx $TMPFS_KEYFILE
 
 	dd if=${RAND_SOURCE} of=${TMPFS_KEYFILE} bs=1c count=${KEYFILE_SIZE} \
 		>/dev/null 2>&1 || exit_script 14
@@ -109,6 +109,8 @@ function seal_key
 {
 	KEY_IN=${1}
 	SEALED_KEY=${2}
+	touch $SEALED_KEY
+	chmod go-rwx $SEALED_KEY
 	tpm_sealdata ${SEAL_OPTS} -i ${KEY_IN} -o ${SEALED_KEY} -z
 	wipe_file ${KEY_IN}
 }
@@ -121,7 +123,7 @@ function luks_add_key
 {
 
 	if [ ! -n "${KEY_SLOT}" ]; then
-		KEY_SLOT=$(cryptsetup luksDump ${DEVICE} | grep 'Key Slot [0-9]: DISABLED' | tail -1 | sed 's/^Key Slot: \([0-9]\):.*/\1/')
+		KEY_SLOT=$(cryptsetup luksDump ${DEVICE} | grep 'Key Slot [0-9]: DISABLED' | tail -1 | sed 's/^Key Slot \([0-9]\):.*/\1/')
 		
 		if [ ! -n "${KEY_SLOT}" ]; then
 			echo "ERROR: Could not find an empty key slot to use, please specify one with -s"
@@ -223,14 +225,20 @@ if [ -z "$SEAL_OPTS" ]; then
 fi
 
 # Start tcsd
-tcsd -f &
+tcsd -f >/dev/null 2>&1 &
 TCSD_PID=$!
 
+#echo "TCSD PID: $TCSD_PID"
+#ps -elf | grep tcsd
+
+
 # check to ensure that the foreground tcsd is running
-if test $(ps -p $TCSD_PID >/dev/null) -ne 0; then
+if $(ps -p $TCSD_PID >/dev/null) ; then
+	echo "Tcsd up and running"
+else
+	
 	echo "WARNING: tcsd is currently running.  Starting tcsd on boot may allow for an attack vector for a regular user to acquire administrative rights"
 fi
-
 # always check that TPM is enabled and owned
 tpm_enabled
 tpm_owned
@@ -240,9 +248,8 @@ if [ "${ACTION}" == "create" ]; then
 	keyfile_generate
 	luks_add_key ${TMPFS_KEYFILE}
 	seal_key ${TMPFS_KEYFILE} ${KEYFILE_NAME}
-	wipe_file ${TMPFS_KEYFILE}
 
-	echo "Using NV index ${NVINDEX} for device ${DEVICE}"
+	#echo "Using NV index for device ${DEVICE}"
 elif [ "${ACTION}" == "migrate" ]; then
 
 	TMPFS_KEYFILE=${TMPFS_MNT}/key
