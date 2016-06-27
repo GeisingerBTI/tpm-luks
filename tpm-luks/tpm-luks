@@ -31,16 +31,17 @@ function wipe_file
 
 function tpm_enabled
 {
+
 	if [ ! -e $TPM_DEVICE/device/enabled ]; then
 		echo "Your TPM device driver doesn't appear to be loaded. Please run"
 		echo "\`modprobe tpm_tis\` to load the driver and re-run this script"
-		exit 7
+		exit_script 7
 	fi
 
 	if [ ! $TPM_DEVICE/device/enabled ]; then
 		echo "Your TPM is not enabled in your BIOS. Please halt the machine and"
 		echo "then cold boot into your BIOS to enable the TPM chip."
-		exit 8
+		exit_script 8
 	fi
 
 	return 0
@@ -51,7 +52,7 @@ function tpm_owned
 	if [ $(cat $TPM_DEVICE/device/owned) -ne 1 ]; then
 		echo "Your TPM is unowned, please take ownership:"
 		#NOTE: We ONLY support the well-known secret for the SRK
-		tpm_takeownership $OWNERPASS -z || exit 9
+		tpm_takeownership $OWNERPASS -z || exit_script 9
 	fi
 
 	return 0
@@ -63,16 +64,16 @@ function find_luks_device
 
 	if [ $NUM_DEVS -eq 0 ]; then
 		echo "Couldn't find a LUKS device!"
-		exit 10
+		exit_script 10
 	elif [ $NUM_DEVS -gt 1 ]; then
 		echo "Found more than one LUKS device, specify a device with the -d option"
-		exit 11
+		exit_script 11
 	fi
 
 	DEVICE="$(blkid -t TYPE=crypto_LUKS|${AWK} -F: '{print $1}')"
 	if [ $? -ne 0 ]; then
 		echo "Couldn't find a LUKS device!"
-		exit 12
+		exit_script 12
 	fi
 
 	return 0
@@ -101,7 +102,7 @@ function keyfile_generate
 	chmod u+rw $TMPFS_KEYFILE
 
 	dd if=${RAND_SOURCE} of=${TMPFS_KEYFILE} bs=1c count=${KEYFILE_SIZE} \
-		>/dev/null 2>&1 || exit 14
+		>/dev/null 2>&1 || exit_script 14
 }
 
 function seal_key
@@ -124,7 +125,7 @@ function luks_add_key
 		
 		if [ ! -n "${KEY_SLOT}" ]; then
 			echo "ERROR: Could not find an empty key slot to use, please specify one with -s"
-			exit 15
+			exit_script 15
 		fi
 	fi
 
@@ -157,6 +158,15 @@ function usage
 	echo -e	"  -h                help"
 }
 
+function exit_script
+{
+	if test -n "$TCSD_PID"; then
+		kill $TCSD_PID
+	fi
+	
+	exit $1
+}
+
 #
 # main()
 #
@@ -171,10 +181,10 @@ SEAL_OPTS=""
 while getopts "cml:s:d:f:p:q:yh" opt; do
 	case $opt in
 	c)
-		[[ "${ACTION}" == "x" ]] && ACTION="create" || (usage && exit 255)
+		[[ "${ACTION}" == "x" ]] && ACTION="create" || (usage && exit_script 255)
 		;;
 	m)
-		[[ "${ACTION}" == "x" ]] && ACTION="migrate" || (usage && exit 255)
+		[[ "${ACTION}" == "x" ]] && ACTION="migrate" || (usage && exit_script 255)
 		;;
 	k)
 		KEYFILE_NAME="${OPTARG}"
@@ -202,14 +212,23 @@ while getopts "cml:s:d:f:p:q:yh" opt; do
 		;;
 	*)
 		usage
-		exit 255
+		exit_script 255
 		;;
 	esac
 done
 
 if [ -z "$SEAL_OPTS" ]; then
 	echo "ERROR: You must provide data sealing options; failure to do so will expose the keyfile, redering encryption useless"
-	exit 20
+	exit_script 20
+fi
+
+# Start tcsd
+tcsd -f &
+TCSD_PID=$!
+
+# check to ensure that the foreground tcsd is running
+if test $(ps -p $TCSD_PID >/dev/null) -ne 0; then
+	echo "WARNING: tcsd is currently running.  Starting tcsd on boot may allow for an attack vector for a regular user to acquire administrative rights"
 fi
 
 # always check that TPM is enabled and owned
@@ -241,7 +260,7 @@ elif [ "${ACTION}" == "migrate" ]; then
 		
 		if [ $RC -ne 0 ] ; then
 			echo "ERROR: Could not unseal current or older version of $KEYFILE_NAME"
-			exit 16
+			exit_script 16
 		fi
 	else
 		cp ${KEYFILE_NAME} ${KEYFILE_NAME}.old
@@ -253,7 +272,7 @@ elif [ "${ACTION}" == "migrate" ]; then
 	echo "Successfully migrated ${KEYFILE_NAME}"
 else
 	usage
-	exit 1
+	exit_script 1
 fi
 
-exit $SCRIPT_RC
+exit_script $SCRIPT_RC
