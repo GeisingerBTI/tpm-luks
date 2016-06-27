@@ -518,9 +518,9 @@ int tpmUnsealFile( char* fname, unsigned char** tss_data, int* tss_size,
 	unpackKey(tssKeyData, tssLen, &tss_key);
 
 	// First, decode the "TSS KEY" using the SRK
-	if((rc=TPM_LoadKey2(0x40000000, srkauth, &tss_key, &hKey)) != 0){
+	if((rc=TPM_LoadKey2(TPM_KH_SRK, srkauth, &tss_key, &hKey)) != 0){
 		tpm_errno = TPMSEAL_STD_ERROR;
-		goto tss_out;
+		goto out;
 	}
 
 	/* unseal the "ENC KEY" using the loaded key from above*/
@@ -678,10 +678,13 @@ int tpmUnsealFile( char* fname, unsigned char** tss_data, int* tss_size,
 	if (bioRc != 1) {
 		tpm_errno = EIO;
 		rc = TPMSEAL_STD_ERROR;
-		goto out;
+		goto tss_out;
 	}
 
 tss_out:
+	// Evict the key that we loaded - don't want it hanging around in the TPM
+	TPM_FlushSpecific(hKey, TPM_RT_KEY);
+
 	//Tspi_Context_Close(hContext);
 out:
 
