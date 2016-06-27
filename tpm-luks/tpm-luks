@@ -180,7 +180,7 @@ KEYFILE_NAME="/boot/.key"
 ACTION="x"
 SEAL_OPTS=""
 
-while getopts "cml:s:d:f:p:q:yh" opt; do
+while getopts "cmk:l:s:d:f:p:q:yh" opt; do
 	case $opt in
 	c)
 		[[ "${ACTION}" == "x" ]] && ACTION="create" || (usage && exit_script 255)
