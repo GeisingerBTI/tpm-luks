@@ -94,8 +94,6 @@ int unpackKey(const BYTE* keyblob, unsigned int blobsz, keydata* key_out){
 	offset += sizeof(uint32_t);
 
 	key_out->authDataUsage = keyblob[offset++];
-	// OVERRIDE!! no auth needed!
-	key_out->authDataUsage = 0;
 
 	key_out->pub.algorithmParms.algorithmID = LOAD32(keyblob, offset);
 	offset += sizeof(uint32_t);
@@ -286,7 +284,9 @@ int tpmUnsealFile( char* fname, unsigned char** tss_data, int* tss_size,
 	         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
 	// The datauth will be the hash of "password" - original, amirite?
-	BYTE dataauth[TPM_HASH_SIZE];
+	BYTE dataauth[TPM_HASH_SIZE] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, \
+	         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
 
 	// If necessary, the SRK password will go here
 	char *srkSecret = NULL;
@@ -523,8 +523,9 @@ int tpmUnsealFile( char* fname, unsigned char** tss_data, int* tss_size,
 		goto out;
 	}
 
+	// NOTE: BOTH the data secret AND the key password are both "password"
 	/* unseal the "ENC KEY" using the loaded key from above*/
-	if ((rc=TPM_Unseal(hKey, NULL, dataauth, evpKeyData, evpLen, symKey, &symKeyLen)) != 0){
+	if ((rc=TPM_Unseal(hKey, dataauth, dataauth, evpKeyData, evpLen, symKey, &symKeyLen)) != 0){
 		tpm_errno = TPMSEAL_STD_ERROR;
 		goto tss_out;
 	}
@@ -693,7 +694,7 @@ out:
 		tpmUnsealShred((unsigned char *) srkSecret, strlen(srkSecret));
 
 	if(symKeyLen)
-		tpmUnsealShred(symKey, symKeyLen);
+		memset( symKey, 0, symKeyLen);
 
 	if ( bdata )
 		BIO_free(bdata);
