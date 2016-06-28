@@ -36,7 +36,7 @@ for d in $(seq 0 $NUM_DEVICES); do
 	fi
 
 	echo "Migrating TPM secret for ${DEVICES[$d]}..."
-	MSG=$(tpm-luks -m -d ${DEVICES[$d]} -f ${NVPERMSFILE})
+	MSG=$(tpm-luks -m -d ${DEVICES[$d]} -k /boot/${KEYFILES[$d]} -f ${NVPERMSFILE})
 	if [ $? -ne 0 ]; then
 		rm -f ${NVPERMSFILE}
 		continue

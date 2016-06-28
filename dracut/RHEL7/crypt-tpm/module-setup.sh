@@ -51,7 +51,6 @@ install() {
         echo >> "${initdir}/etc/cmdline.d/90crypt.conf"
     fi
     
-    # TODO: install a custom script to unseal data!
     inst_multiple getcapability tpm_unseal awk od dd cut cat grep stat mkdir read base64 touch chmod ls
     inst_script "$moddir"/cryptroot-ask-tpm.sh /sbin/cryptroot-ask-tpm
 

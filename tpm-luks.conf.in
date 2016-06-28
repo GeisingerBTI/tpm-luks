@@ -14,5 +14,5 @@
 #
 # example:
 #
-#/dev/sda2:/boot/.key:@sbindir@/tpm-luks-gen-tgrub2-pcr-values
+#/dev/sda2:.key:@sbindir@/tpm-luks-gen-tgrub2-pcr-values
 #
