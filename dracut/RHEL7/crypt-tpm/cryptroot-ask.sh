@@ -145,7 +145,7 @@ else
 fi
 
 if [ $ask_passphrase -ne 0 ]; then
-    cryptroot-ask-tpm $device /boot/.key $luksname
+    cryptroot-ask-tpm $device $luksname
 fi
 
 unset device luksname luksfile

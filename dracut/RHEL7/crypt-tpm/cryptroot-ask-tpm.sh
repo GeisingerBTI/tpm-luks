@@ -15,8 +15,6 @@ TMPFS_MNT=/tmp/cryptroot-mnt
 KEY_MNT=/tmp/key-mnt
 KEYFILE=$TMPFS_MNT/key
 
-#SEALEDKEY=/boot/.key
-
 TPM_LUKS_CONF=/etc/tpm-luks.conf
 
 DEVICE=$1
@@ -73,7 +71,7 @@ fi
 for f in $(ls /dev/disk/by-uuid); do
 	RAW_DISK=$(readlink -f /dev/disk/by-uuid/$f)
 	if [ ! "$RAW_DISK" == "$DEVICE" ]; then
-		mount $RAW_DISK $KEY_MNT
+		mount -o ro $RAW_DISK $KEY_MNT
 		RC=$?
 		if [ $RC -eq 0 ]; then
 			if [[ -f $KEY_MNT/$SEALEDKEY ]]; then
@@ -108,23 +106,6 @@ umount $TMPFS_MNT
 # if error
 
 if [ $RC -ne 0 ]; then
-	umount $TMPFS_MNT
-	exit 255
-fi
-
-F_SIZE=$(stat -c %s $KEYFILE)
-
-# Open the luks partition using the key
-info "Opening LUKS partition $DEVICE using TPM key."
-cryptsetup luksOpen $DEVICE $NAME --key-file $KEYFILE
-RC=$?
-# Zeroize keyfile regardless of success/fail and unmount
-dd if=/dev/zero of=$KEYFILE bs=1c count=$F_SIZE >/dev/null 2>&1
-umount $TMPFS_MNT
-# if error
-
-if [ $RC -ne 0 ]; then
-	warn "cryptsetup failed."
 	exit 255
 fi
 
