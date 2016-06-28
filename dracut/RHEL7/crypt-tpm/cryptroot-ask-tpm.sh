@@ -70,16 +70,34 @@ if [ ! -d $KEY_MNT ]; then
 	fi
 fi
 
-exit 255
-
-
-tpm_unseal -z -i $KEY_MNT/$SEALEDKEY -o $KEYFILE
-RC=$?
-if [ $RC -eq 24 ]; then
-	warn "TPM Unseal PCR mismatch."
-elif [ $RC -ne 0 ]; then
-	warn "TPM Unseal Unknown error ($RC)"
-fi
+for f in $(ls /dev/disk/by-uuid); do
+	RAW_DISK=$(readlink -f /dev/disk/by-uuid/$f)
+	if [ ! "$RAW_DISK" == "$DEVICE" ]; then
+		mount $RAW_DISK $KEY_MNT
+		RC=$?
+		if [ $RC -eq 0 ]; then
+			if [[ -f $KEY_MNT/$SEALEDKEY ]]; then
+				tpm_unseal -z -i $KEY_MNT/$SEALEDKEY -o $KEYFILE
+				RC=$?
+				if [ $RC -eq 24 ]; then
+					warn "TPM Unseal PCR mismatch."
+				elif [ $RC -ne 0 ]; then
+					warn "TPM Unseal Unknown error ($RC)"
+				else
+					info "TPM Unseal success!"
+					umount $KEY_MNT
+					break
+				fi
+			else
+				warn "$SEALEDKEY not found on $RAW_DISK"
+				umount $KEY_MNT
+			fi
+		else
+			warn "Unable to mount $RAW_DISK"
+		fi
+		
+	fi
+done
 
 info "Opening LUKS partition $DEVICE using TPM key."
 cryptsetup luksOpen $DEVICE $NAME --key-file $KEYFILE
