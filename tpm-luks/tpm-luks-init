@@ -37,7 +37,7 @@ for d in $(seq 0 $NUM_DEVICES); do
 	fi
 
 	echo "Creating new TPM NVRAM secret for ${DEVICES[$d]}..."
-	tpm-luks -c -d ${DEVICES[$d]} -k /boot/${KEYFILES[$d]} -f ${NVPERMSFILE}
+	tpm-luks -c -d ${DEVICES[$d]} -k /boot/${KEYFILES[$d]} -f ${NVPERMSFILE} -y
 	if [ $? -ne 0 ]; then
 		echo "tpm-luks has failed. Aborting."
 		exit 3
