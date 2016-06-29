@@ -53,7 +53,7 @@ install() {
 
     if [[ $hostonly_cmdline == "yes" ]]; then
         local _cryptconf=$(cmdline)
-        [[ $_cryptconf ]] && printf "%s\n" "$_cryptconf" >> "${initdir}/etc/cmdline.d/90crypt.conf"
+        [[ $_cryptconf ]] && printf "%s\n" "$_cryptconf" >> "${initdir}/etc/cmdline.d/90crypt-tpm.conf"
     fi
     
     # Needed by TPM add-on
@@ -87,7 +87,7 @@ install() {
                 fi
             done
         done < /etc/crypttab > $initdir/etc/crypttab
-        mark_hostonly /etc/crypttab
+        #mark_hostonly /etc/crypttab
     fi
 
     inst_simple "$moddir/crypt-lib.sh" "/lib/dracut-crypt-lib.sh"
@@ -101,7 +101,7 @@ install() {
                       $systemdsystemunitdir/cryptsetup.target \
                       $systemdsystemunitdir/sysinit.target.wants/cryptsetup.target \
                       systemd-ask-password systemd-tty-ask-password-agent
-        inst_script "$moddir"/crypt-run-generator.sh /sbin/crypt-run-generator
+        #inst_script "$moddir"/crypt-run-generator.sh /sbin/crypt-run-generator
     fi
     
     dracut_need_initqueue

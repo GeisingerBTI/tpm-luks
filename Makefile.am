@@ -31,6 +31,7 @@ plymouthdir=/usr/lib/dracut/modules.d/90crypt-tpm
 dist_plymouth_SCRIPTS=dracut/RHEL7/crypt-tpm/cryptroot-ask.sh \
                       dracut/RHEL7/crypt-tpm/cryptroot-ask-tpm.sh \
                       dracut/RHEL7/crypt-tpm/crypt-cleanup.sh \
+                      dracut/RHEL7/crypt-tpm/crypt-run-generator.sh \
                       dracut/RHEL7/crypt-tpm/crypt-lib.sh \
                       dracut/RHEL7/crypt-tpm/module-setup.sh \
                       dracut/RHEL7/crypt-tpm/parse-crypt.sh \
