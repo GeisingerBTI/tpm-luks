@@ -1,17 +1,21 @@
 #!/bin/sh
-# -*- mode: shell-script; indent-tabs-mode: nil; sh-basic-offset: 4; -*-
-# ex: ts=8 sw=4 sts=4 et filetype=sh
 
 command -v getarg >/dev/null || . /lib/dracut-lib.sh
 
 # check if the crypttab contains an entry for a LUKS UUID
 crypttab_contains() {
     local luks="$1"
+    local dev="$2"
     local l d rest
     if [ -f /etc/crypttab ]; then
-        while read l d rest; do
+        while read l d rest || [ -n "$l" ]; do
             strstr "${l##luks-}" "${luks##luks-}" && return 0
             strstr "$d" "${luks##luks-}" && return 0
+            if [ -n "$dev" ]; then
+                for _dev in "$(devnames $d)"; do
+                    [ "$dev" -ef "$_dev" ] && return 0
+                done
+            fi
         done < /etc/crypttab
     fi
     return 1
@@ -44,10 +48,10 @@ ask_for_password() {
 
     while [ $# -gt 0 ]; do
         case "$1" in
-            --cmd) ply_cmd="$2"; tty_cmd="$2" shift;;
+            --cmd) ply_cmd="$2"; tty_cmd="$2"; shift;;
             --ply-cmd) ply_cmd="$2"; shift;;
             --tty-cmd) tty_cmd="$2"; shift;;
-            --prompt) ply_prompt="$2"; tty_prompt="$2" shift;;
+            --prompt) ply_prompt="$2"; tty_prompt="$2"; shift;;
             --ply-prompt) ply_prompt="$2"; shift;;
             --tty-prompt) tty_prompt="$2"; shift;;
             --tries) ply_tries="$2"; tty_tries="$2"; shift;;
@@ -157,7 +161,7 @@ getkey() {
     [ -f "$keys_file" ] || return 1
 
     local IFS=:
-    while read luks_dev key_dev key_path; do
+    while read luks_dev key_dev key_path || [ -n "$luks_dev" ]; do
         if match_dev "$luks_dev" "$for_dev"; then
             echo "${key_dev}:${key_path}"
             return 0
@@ -215,62 +219,4 @@ readkey() {
     # and install a pre-pivot cleanup hook
     umount "$mntp"
     rmdir "$mntp"
-}
-
-function readpass() {
-
-    unset PASSWORD
-    unset PROMPT
-
-    STTY_ORIG=$(stty -g)
-    #stty -echo
-
-    CHARCOUNT=0
-    ESCAPED=0
-    while IFS= read -p "$PROMPT" -r -s -n 1 CHAR
-    do
-        # Enter - accept password
-        if [[ $CHAR == $'\0' ]] ; then
-            break
-        fi
-        # Backspace
-        if [[ $CHAR == $'\177' ]] ; then
-            if [ $CHARCOUNT -gt 0 ] ; then
-                CHARCOUNT=$((CHARCOUNT-1))
-                PROMPT=$'\b \b'
-                PASSWORD="${PASSWORD%?}"
-            else
-                PROMPT=''
-            fi
-            continue
-        fi
-        # Escape
-        if [[ $CHAR == $'\33' ]] ; then
-            if [ $ESCAPED -eq 0 ] ; then
-                ESCAPED=1
-            else
-                ESCAPED=0
-            fi
-            PROMPT=''
-            continue
-        fi
-        # Any char
-        CHARCOUNT=$((CHARCOUNT+1))
-        if [ $ESCAPED -eq 0 ] ; then
-            PROMPT='*'
-        else
-            PROMPT="$CHAR"
-        fi
-        PASSWORD+="$CHAR"
-    done
-
-    stty $STTY_ORIG
-
-    if [ -z "$1" ] ; then
-        echo $PASSWORD
-    else
-        eval $1='$PASSWORD'
-        echo
-    fi
-
 }
