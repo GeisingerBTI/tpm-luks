@@ -2,6 +2,8 @@
 # -*- mode: shell-script; indent-tabs-mode: nil; sh-basic-offset: 4; -*-
 # ex: ts=8 sw=4 sts=4 et filetype=sh
 
+#set -x
+
 PATH=/usr/sbin:/usr/bin:/sbin:/bin
 NEWROOT=${NEWROOT:-"/sysroot"}
 
@@ -146,6 +148,17 @@ fi
 
 if [ $ask_passphrase -ne 0 ]; then
     cryptroot-ask-tpm $device $luksname
+
+    # Uh-oh! Looks like TPM failed, fall back to passphrase!
+    if [ $? -ne 0 ]; then
+        luks_open="$(command -v cryptsetup) luksOpen"
+        
+        ask_for_password --ply-tries 5 \
+            --ply-cmd "$luks_open -T1 $device $luksname" \
+            --ply-prompt "Enter a Passphrase for LUKS device $device - $luksname" \
+            --tty-tries 1 --tty-cmd "$luks_open -T5 $device $luksname"
+        
+        unset luks_open
 fi
 
 unset device luksname luksfile

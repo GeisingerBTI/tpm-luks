@@ -236,7 +236,7 @@ TCSD_PID=$!
 if $(ps -p $TCSD_PID >/dev/null) ; then
 	echo "Tcsd up and running"
 else
-	
+	TCSD_PID=
 	echo "WARNING: tcsd is currently running.  Starting tcsd on boot may allow for an attack vector for a regular user to acquire administrative rights"
 fi
 # always check that TPM is enabled and owned
@@ -274,7 +274,6 @@ elif [ "${ACTION}" == "migrate" ]; then
 	fi
 
 	seal_key ${TMPFS_KEYFILE} ${KEYFILE_NAME}
-	wipe_file ${TMPFS_KEYFILE}
 	
 	echo "Successfully migrated ${KEYFILE_NAME}"
 else
