@@ -5,7 +5,7 @@
 # Author: Kent Yoder <shpedoikal@gmail.com>
 #
 
-set -x
+#set -x
 
 PATH=/usr/sbin:/usr/bin:/sbin:/bin
 . /lib/dracut-crypt-lib.sh
@@ -47,17 +47,6 @@ fi
 touch $KEYFILE
 chmod go-rwx $KEYFILE
 
-
-
-info "Root:"
-ls -alh /
-
-info "etc:"
-ls -alh /etc
-
-info "dev/disk"
-ls -alhR /dev/disk
-
 # Go through the devices searching for an unencrypted boot device that has the 
 # sealed key on it
 if [ ! -d $KEY_MNT ]; then
@@ -67,6 +56,8 @@ if [ ! -d $KEY_MNT ]; then
 		exit 255
 	fi
 fi
+
+LOADED=0
 
 for f in $(ls /dev/disk/by-uuid); do
 	RAW_DISK=$(readlink -f /dev/disk/by-uuid/$f)
@@ -83,13 +74,24 @@ for f in $(ls /dev/disk/by-uuid); do
 					warn "TPM Unseal Unknown error ($RC)"
 				else
 					info "TPM Unseal success!"
-					umount $KEY_MNT
-					break
+					FOUND_KEY=1
+					info "Opening LUKS partition $DEVICE using TPM key."
+					cryptsetup luksOpen $DEVICE $NAME --key-file $KEYFILE
+					RC=$?
+					F_SIZE=$(stat -c %s $KEYFILE)
+					# Zeroize keyfile regardless of success/fail and unmount
+					dd if=/dev/zero of=$KEYFILE bs=1c count=$F_SIZE >/dev/null 2>&1
+					if [ $RC -eq 0 ]; then
+						info "LUKS unlock success!"
+						umount $KEY_MNT
+						LOADED=1
+						break
+					fi
 				fi
 			else
 				warn "$SEALEDKEY not found on $RAW_DISK"
-				umount $KEY_MNT
 			fi
+			umount $KEY_MNT
 		else
 			warn "Unable to mount $RAW_DISK"
 		fi
@@ -97,15 +99,10 @@ for f in $(ls /dev/disk/by-uuid); do
 	fi
 done
 
-info "Opening LUKS partition $DEVICE using TPM key."
-cryptsetup luksOpen $DEVICE $NAME --key-file $KEYFILE
-RC=$?
-# Zeroize keyfile regardless of success/fail and unmount
-dd if=/dev/zero of=$KEYFILE bs=1c count=$F_SIZE >/dev/null 2>&1
 umount $TMPFS_MNT
 # if error
 
-if [ $RC -ne 0 ]; then
+if [ $LOADED -eq 0 ]; then
 	exit 255
 fi
 

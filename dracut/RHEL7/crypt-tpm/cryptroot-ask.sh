@@ -153,7 +153,7 @@ if [ $ask_passphrase -ne 0 ]; then
         luks_open="$(command -v cryptsetup) $cryptsetupopts luksOpen"
         ask_for_password --ply-tries 5 \
             --ply-cmd "$luks_open -T1 $device $luksname" \
-            --ply-prompt "Password ($device)" \
+            --ply-prompt "WARNING: Boot process has changed unexpectedly!  Do not proceed unless you were expecting this message!!\nEnter Passphrase for $device: $luksname" \
             --tty-tries 1 \
             --tty-cmd "$luks_open -T5 $device $luksname"
         unset luks_open
