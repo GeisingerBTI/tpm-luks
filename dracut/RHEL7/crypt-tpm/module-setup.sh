@@ -51,7 +51,7 @@ install() {
         echo >> "${initdir}/etc/cmdline.d/90crypt.conf"
     fi
     
-    inst_multiple getcapability nv_readvalue awk od dd cut cat grep stat mkdir read base64
+    inst_multiple getcapability nv_readvalue tpm_unseal awk od dd cut cat grep stat mkdir read base64 chmod touch ls
     inst_script "$moddir"/cryptroot-ask-tpm.sh /sbin/cryptroot-ask-tpm
 
     inst_multiple cryptsetup rmdir readlink umount
