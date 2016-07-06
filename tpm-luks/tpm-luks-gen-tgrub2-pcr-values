@@ -60,7 +60,7 @@
 
 #set -x
 
-PCRS="4 5 8 9 11 14"
+PCRS="4 5 8 9 11 13 14"
 TMPFILE=
 BOOT_DIR=/boot
 BOOT_CFG=
@@ -197,7 +197,7 @@ for PCRNUM in ${PCRS[@]}; do
 			;;
 		14)
 			# OK, we're gonna get ugly here....
-			# the vmlinuz comes first (KERNEL), then the initramfs (INITRD)i
+			# the vmlinuz comes first (KERNEL), then the initramfs (INITRD)
 			CURR_PCR=$(tpm-luks-chain-hashes $KERNEL $INITRD)
 			
 			echo "$PCRNUM $CURR_PCR" >> ${OUTFILE}
@@ -208,6 +208,7 @@ for PCRNUM in ${PCRS[@]}; do
 			
 			;;
 		*)
+			# NOTE: PCR 13 assumes NO NEW MODULES!!
 			echo "$PCRNUM $CURR_PCR" >> ${OUTFILE}
 			;;
 		esac
