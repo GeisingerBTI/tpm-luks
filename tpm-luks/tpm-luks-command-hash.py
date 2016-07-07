@@ -4,6 +4,7 @@ import shlex
 import sys
 import re
 import hashlib
+import binascii
 
 import pprint
 
@@ -47,20 +48,20 @@ def parse_line(cmd_args, f, cmds):
 		final_str = c
 		found = False
 		
-		print "Looking for dollar in", c
+		#print "Looking for dollar in", c
 	
 		d_idx = c.find('$')
 		while d_idx != -1:
-			print "FOUND:", c[d_idx:]
+			#print "FOUND:", c[d_idx:]
 			# OK, we found a dollar sign!
 			# make sure it isn't prepended by a backslash
 			if len(c) > d_idx+1 and (d_idx == 0 or (d_idx > 0 and c[d_idx-1] != '\\') ):
 				# time to get the name of the next variable
 				if c[d_idx+1] == '{':
-					print "searching for braced variable"
+					#print "searching for braced variable"
 					b_idx = max(c.find('}',d_idx+1),len(c))
 				else:
-					print "searching for end of non-braced variable"
+					#print "searching for end of non-braced variable"
 					b_obj = re.search(r'[^0-9A-Za-z_]', c[d_idx+1:])
 					b_idx = len(c) if b_obj is None else d_idx+1+b_obj.start()
 
@@ -105,8 +106,8 @@ def parse_function(fn_name, f):
 		
 		cmd_args = get_cmd(cmd_line)
 		next_cmd = "" if len(cmd_args) == 0 else cmd_args[0]
-		print next_cmd
-		print cmd_args
+		#print next_cmd
+		#print cmd_args
 		if len(cmd_args) > 0:
 			next_cmd = cmd_args[0]
 			parse_line(cmd_args, f, cmds)
@@ -154,7 +155,7 @@ def parse_if(condition, f):
 				parse_line(cmd_args, f, t_list if in_true else f_list)
 	
 	# OK, we have a "fi", return our tuple
-	print (condition, t_list, f_list)
+	#print (condition, t_list, f_list)
 	return (condition, t_list, f_list)
 	
 	
@@ -205,8 +206,8 @@ def hash_cmd(in_str):
 	m = hashlib.sha1()
 	m.update(in_str)
 	
-	print "Hashing", in_str
-	print m.hexdigest()
+	#print "Hashing", in_str
+	#print m.hexdigest()
 	
 	return m.hexdigest()
 	
@@ -227,16 +228,55 @@ def find_tuple_path(cmd_tuple, last_hashes):
 	"""
 	Find the best path through an if/else block.
 	"""
+	t_path = find_command_hash(cmd_tuple[1], last_hashes)
+	f_path = find_command_hash(cmd_tuple[2], last_hashes)
+	
+	# I want the priority to be the fewest # of misses, followed by the 
+	# most hashes consumed, then true
+	sort_list = [(t_path[0], -t_path[1], 0), (f_path[0], -f_path[1], 1)]
+	sort_list.sort()
+	
+	if sort_list[0][2] == 0:
+		return t_path
+	else:
+		return f_path
 	
 	
 def find_command_hash(cmd_hash, last_hashes):
 	"""
 	Finds the best path through the given commands, and returns a tuple of the 
-	number of misses as well as the best path list
+	number of misses, number of hashes consumed, as well as the best path list
 	"""
 	curr_idx = 0
+	num_misses = 0
+	hash_list = []
 	
-	
+	for c in cmd_hash:
+		if isinstance(c, tuple):
+			tpath = find_tuple_path(c,last_hashes[curr_idx:])
+			num_misses += tpath[0]
+			curr_idx += tpath[1]
+			hash_list.extend(tpath[2])
+		else:
+			# here we have a hash
+			# we'll definitely hit this hash, so add it!
+			hash_list.append(c)
+
+			# search from the current position looking for a matching hash			
+			t_idx = curr_idx
+			while t_idx < len(last_hashes) and c != last_hashes[t_idx]:
+				t_idx += 1
+			
+			# hash not found, add to num misses
+			if t_idx == len(last_hashes):
+				num_misses += 1
+			# hash found, add to number of consumed
+			else:
+				curr_idx = t_idx+1
+				
+	return (num_misses, curr_idx, hash_list)
+			
+			
 	
 
 def find_best_path(cmd_hash, menu_hash, last_hashes):
@@ -247,7 +287,14 @@ def find_best_path(cmd_hash, menu_hash, last_hashes):
 	Will return a list of hashes that should be generated on the next boot
 	"""
 	# First, hash the commands
-		
+	chash = find_command_hash(cmd_hash, last_hashes)
+	
+	# next, hash only the first menu entry (we can heuristically find a better 
+	# solution a la find_tuple_path, but this is easier and functionally 
+	# consistent with PCR 10/14
+	mhash = find_command_hash(menu_hash[0], last_hashes[chash[1]:])
+	
+	return chash[2] + mhash[2]
 	
 	
 def chain_hashes(hash_list):
@@ -255,7 +302,17 @@ def chain_hashes(hash_list):
 	Chains the hashes in the method for a TPM chain.  Will return a hex digest
 	of the final TPM PCR value to be expected from the list of hashes
 	"""
-
+	# start with 20 bytes of 0
+	currval = '\0' * 20
+	
+	for h in hash_list:
+		v = currval + binascii.a2b_hex(h)
+		m = hashlib.sha1()
+		m.update(v)
+		currval = m.digest()
+	
+	return binascii.b2a_hex(currval)
+		
 if __name__ == "__main__":
 	in_f = file(sys.argv[1], 'r')
 	#hashf_in = file(sys.argv[2], 'r')
@@ -281,11 +338,11 @@ if __name__ == "__main__":
 		next_line = in_f.readline()
 		
 	# now show me
-	print "=== Command List ==="
-	pprint.pprint(cmd_list)
+	#print "=== Command List ==="
+	#pprint.pprint(cmd_list)
 	
-	print "=== Menu List ==="
-	pprint.pprint(menu_list)
+	#print "=== Menu List ==="
+	#pprint.pprint(menu_list)
 	
 	# Now, let's generate some hashing!
 	hash_cmds = hash_cmd_list(cmd_list)
@@ -295,21 +352,21 @@ if __name__ == "__main__":
 	for l in menu_list:
 		hash_menu.append(hash_cmd_list(l))
 	
-	print "=== Hashed Commands ==="
-	pprint.pprint(hash_cmds)
+	#print "=== Hashed Commands ==="
+	#pprint.pprint(hash_cmds)
 	
-	print "=== Hashed Menu ==="
-	pprint.pprint(hash_menu)
+	#print "=== Hashed Menu ==="
+	#pprint.pprint(hash_menu)
 	
 	last_hashes=[]
-	with f in file(sys,argv[2], 'r'):
+	with file(sys.argv[2], 'r') as f:
 		for l in f:
 			last_hashes.append(l.strip())
 		
-	print "=== Last hashes ==="
-	pprint.pprint(last_hashes)
+	#print "=== Last hashes ==="
+	#pprint.pprint(last_hashes)
 	
-	next_boot_hash = find_best_path(hash_cmds, hash_menu, last_hash)
+	next_boot_hash = find_best_path(hash_cmds, hash_menu, last_hashes)
 	
 	# Now, chain all the hashes in the next boot hash, starting with all 0
 	print chain_hashes(next_boot_hash)

@@ -204,6 +204,8 @@ for PCRNUM in ${PCRS[@]}; do
 			;;
 		11)
 			# and the ugliest of all ... the command string!
+			CURR_PCR=$(tpm-luks-command-hash.py $BOOT_CFG <(cat /sys/kernel/security/tpm0/ascii_bios_measurements | grep ^11 | cut -f2 -d' ') )
+			
 			echo "$PCRNUM $CURR_PCR" >> ${OUTFILE}
 			
 			;;
