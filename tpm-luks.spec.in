@@ -55,8 +55,8 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{dracutlibdir}/modules.d/%{dracut_mod_name}/*
 %dir /etc/yum/post-actions
 /etc/yum/post-actions/tpm-luks.action
-%config /etc/yum/pluginconf.d/post-transaction-actions.conf
-/usr/lib/yum-plugins/post-transaction-actions.py*
+#%config /etc/yum/pluginconf.d/post-transaction-actions.conf
+#/usr/lib/yum-plugins/post-transaction-actions.py*
 %config /etc/tpm-luks.conf
 
 %changelog

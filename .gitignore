@@ -26,6 +26,8 @@ swtpm-utils/lib/libtpm.la
 swtpm-utils/lib/Makefile
 swtpm-utils/lib/Makefile.in
 swtpm-utils/nv_readvalue
+swtpm-utils/tpm_unseal
 tpm-luks.spec
+tpm-luks.conf
 yum/tpm-luks.action
 tpm-luks/tpm-luks-parse-config

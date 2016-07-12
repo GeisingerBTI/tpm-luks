@@ -55,7 +55,8 @@ dist_sbin_SCRIPTS=tpm-luks/tpm-luks-chain-hashes \
 #dist_yumplugins_SCRIPTS=yum/post-transaction-actions.py
 
 yumpostactionsdir=/etc/yum/post-actions
-dist_yumpostactions_SCRIPTS=yum/tpm-luks.action
+#dist_yumpostactions_SCRIPTS=yum/tpm-luks.action
+yumpostactions_SCRIPTS=yum/tpm-luks.action
 
 confdir=/etc
 conf_SCRIPTS=tpm-luks.conf
