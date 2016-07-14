@@ -176,7 +176,7 @@ for PCRNUM in ${PCRS[@]}; do
 
 	# XXX TODO Checkfile support in PCR13
 	if test $CALC_PCR -eq 0; then
-		echo "r $PCRNUM $CURR_PCR" >> ${OUTFILE}
+		echo "$PCRNUM $CURR_PCR" >> ${OUTFILE}
 	else
 	
 		case $PCRNUM in
