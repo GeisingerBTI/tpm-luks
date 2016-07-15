@@ -225,7 +225,7 @@ if [ -z "$SEAL_OPTS" ]; then
 fi
 
 # Start tcsd
-tcsd -f >/dev/null 2>&1 &
+tcsd -f &
 TCSD_PID=$!
 
 #echo "TCSD PID: $TCSD_PID"
