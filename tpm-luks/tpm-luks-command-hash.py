@@ -5,9 +5,11 @@ import sys
 import re
 import hashlib
 import binascii
+import subprocess
 
 import pprint
 
+grub_editenv="grub2-editenv"
 
 functions = {}
 variables = {}
@@ -56,20 +58,23 @@ def parse_line(cmd_args, f, cmds):
 			# OK, we found a dollar sign!
 			# make sure it isn't prepended by a backslash
 			if len(c) > d_idx+1 and (d_idx == 0 or (d_idx > 0 and c[d_idx-1] != '\\') ):
+				unbraced=True
 				# time to get the name of the next variable
 				if c[d_idx+1] == '{':
-					#print "searching for braced variable"
-					b_idx = max(c.find('}',d_idx+1),len(c))
+					#print "searching for braced variable, starting with", c[d_idx+1:]
+					unbraced=False
+					b_idx = min(c.find('}',d_idx+1),len(c))
 				else:
 					#print "searching for end of non-braced variable"
 					b_obj = re.search(r'[^0-9A-Za-z_]', c[d_idx+1:])
 					b_idx = len(c) if b_obj is None else d_idx+1+b_obj.start()
 
-				var_name = c[d_idx+2:b_idx]
+				var_name = c[(d_idx+2-unbraced):(b_idx)]
+				#print "Searching for variable:", var_name
 				var_val = variables.get(var_name, "")
 				# build my final string
 				found = True
-				final_str = c[:d_idx] + var_val + c[b_idx:]
+				final_str = c[:d_idx] + var_val + c[b_idx+(not unbraced):]
 				d_idx += 1
 				
 			d_idx = final_str.find('$', d_idx)
@@ -288,10 +293,23 @@ def find_best_path(cmd_hash, menu_hash, last_hashes):
 	"""
 	# First, hash the commands
 	chash = find_command_hash(cmd_hash, last_hashes)
-	
+
+	#print "==== Command Hashes ===="
+	#pprint.pprint(cmd_hash)
+
+	#print "==== Consumed Command Hashes ===="
+	#pprint.pprint(last_hashes[:chash[1]])
+
 	# next, hash only the first menu entry (we can heuristically find a better 
 	# solution a la find_tuple_path, but this is easier and functionally 
 	# consistent with PCR 10/14
+
+	#print "==== Menu Commands ===="
+	#pprint.pprint(menu_hash[0])
+
+	#print "==== Last Hashes ===="
+	#pprint.pprint(last_hashes[chash[1]:])
+	
 	mhash = find_command_hash(menu_hash[0], last_hashes[chash[1]:])
 	
 	return chash[2] + mhash[2]
@@ -314,6 +332,17 @@ def chain_hashes(hash_list):
 	return binascii.b2a_hex(currval)
 		
 if __name__ == "__main__":
+
+	# First, let's set any variables from the grubenv
+	grubvars = subprocess.check_output(grub_editenv + " list", shell=True)
+	#print "==== Variables ====\n",grubvars
+	for v in grubvars.split('\n'):
+		varval = v.split('=', 1)
+		if len(varval) == 2:
+			variables[varval[0]] = varval[1]
+
+	#pprint.pprint(variables)
+
 	in_f = file(sys.argv[1], 'r')
 	#hashf_in = file(sys.argv[2], 'r')
 	
