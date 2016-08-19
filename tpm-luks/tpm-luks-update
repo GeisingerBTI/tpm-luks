@@ -32,14 +32,15 @@ for d in $(seq 0 $NUM_DEVICES); do
 	${SCRIPTS[$d]} -o ${NVPERMSFILE}
 	if [ $? -ne 0 ]; then
 		echo "${SCRIPTS[$d]} has failed."
-		continue
+		exit 2
 	fi
 
 	echo "Migrating TPM secret for ${DEVICES[$d]}..."
 	MSG=$(tpm-luks -m -d ${DEVICES[$d]} -k /boot/${KEYFILES[$d]} -f ${NVPERMSFILE})
 	if [ $? -ne 0 ]; then
+		echo "Could not migrate TPM secret.  You will need to re-run tpm-luks-init after rebooting."
 		rm -f ${NVPERMSFILE}
-		continue
+		exit 3
 	fi
 	rm -f ${NVPERMSFILE}
 

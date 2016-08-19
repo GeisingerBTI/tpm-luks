@@ -227,6 +227,11 @@ fi
 # Start tcsd
 tcsd -f &
 TCSD_PID=$!
+# Hold on for a second to allow for tcsd to come up to speed
+# without this, often we will get errors not seen on the
+# command line
+sleep 1
+
 
 #echo "TCSD PID: $TCSD_PID"
 #ps -elf | grep tcsd
