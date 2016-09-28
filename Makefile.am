@@ -46,7 +46,8 @@ dist_sbin_SCRIPTS=tpm-luks/tpm-luks-chain-hashes \
 	     tpm-luks/tpm-luks-gen-tgrub2-pcr-values \
 	     tpm-luks/tpm-luks-update \
 	     tpm-luks/tpm-luks-init \
-             tpm-luks/tpm-luks-command-hash.py
+         tpm-luks/tpm-luks-command-hash.py \
+         tpm-luks/tpm-luks-autogen-conf.py
 
 #yumpluginconfdir=/etc/yum/pluginconf.d
 #dist_yumpluginconf_SCRIPTS=yum/post-transaction-actions.conf
