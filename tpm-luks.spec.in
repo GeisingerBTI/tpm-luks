@@ -7,7 +7,7 @@
 
 Name:		@PACKAGE@
 Version:	@VERSION@
-Release:	3
+Release:	4
 Summary:	Utility for storing a LUKS key using a TPM
 
 Group:		Security
@@ -63,6 +63,10 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_sbindir}/tpm-luks-autogen-conf.py %{_sbindir}/tpm-luks-gen-tgrub2-pcr-values >> /etc/tpm-luks.conf
 
 %changelog
+* Tue Oct 04 2016 John Wallace <jrwallace2@geisinger.edu>
+- Allowed the use of "UUID=" notation in tpm-luks.conf
+- Inverted sealing and adding key to LUKS to avoid key space exhaustion
+
 * Mon Sep 26 2016 John Wallace <jrwallace2@gesinger.edu>
 - Updated to build on RHEL7
 - Using a (sealed) key file on boot partition instead of NVRAM
