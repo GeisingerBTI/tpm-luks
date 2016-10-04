@@ -112,7 +112,7 @@ function seal_key
 	touch $SEALED_KEY
 	chmod go-rwx $SEALED_KEY
 	tpm_sealdata ${SEAL_OPTS} -i ${KEY_IN} -o ${SEALED_KEY} -z
-	wipe_file ${KEY_IN}
+	return $?
 }
 
 
@@ -136,6 +136,7 @@ function luks_add_key
 
 	$CRYPTSETUP luksAddKey --key-slot ${KEY_SLOT} $DEVICE ${1}
 	SCRIPT_RC=$?
+	return $SCRIPT_RC
 }
 
 function usage
@@ -251,10 +252,17 @@ tpm_owned
 if [ "${ACTION}" == "create" ]; then
 	device_get
 	keyfile_generate
-	luks_add_key ${TMPFS_KEYFILE}
 	seal_key ${TMPFS_KEYFILE} ${KEYFILE_NAME}
-
-	#echo "Using NV index for device ${DEVICE}"
+	SEAL_RC=$?
+	if [ $SEAL_RC -eq 0 ]; then
+		luks_add_key ${TMPFS_KEYFILE}
+	else
+		echo "Could not seal keyfile, not adding key to LUKS"
+		SCRIPT_RC=21
+	fi
+	
+	wipe_file ${TMPFS_KEYFILE}
+	
 elif [ "${ACTION}" == "migrate" ]; then
 
 	TMPFS_KEYFILE=${TMPFS_MNT}/key
@@ -279,8 +287,15 @@ elif [ "${ACTION}" == "migrate" ]; then
 	fi
 
 	seal_key ${TMPFS_KEYFILE} ${KEYFILE_NAME}
+	SEAL_RC=$?
+	wipe_file ${TMPFS_KEYFILE}
+	if [ $SEAL_RC -eq 0 ]; then
+		echo "Successfully migrated ${KEYFILE_NAME}"
+	else
+		echo "Could not migrate ${KEYFILE_NAME}, error sealing new keyfile"
+		SCRIPT_RC=21
+	fi
 	
-	echo "Successfully migrated ${KEYFILE_NAME}"
 else
 	usage
 	exit_script 1

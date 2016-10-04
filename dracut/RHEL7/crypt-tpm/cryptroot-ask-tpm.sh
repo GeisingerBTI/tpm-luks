@@ -21,25 +21,47 @@ DEVICE=$1
 NAME=$2
 
 # Find the name of the sealed keyfile to use
-SEALEDKEY=$(cat $TPM_LUKS_CONF | grep -v "^\s*#" | grep $DEVICE | cut -d: -f2)
+# Find the name of the sealed keyfile to use
+#keyf=$(mktemp)
+
+SEALEDKEY=$(grep -v "^\s*#" $TPM_LUKS_CONF | \
+while read l; do
+	
+	# Allow for UUID= and LABEL= based names
+	DEV=$(echo $l | cut -d: -f1)
+	if [ "${DEV%%=*}" = "UUID" ]; then
+		DEV=$(readlink -f /dev/disk/by-uuid/${DEV#UUID=})
+	elif [ "${DEV%%=*}" = "LABEL" ]; then
+		DEV=$(readlink -f /dev/disk/by-label/${DEV#LABEL=})
+	fi
+	
+	if [ "$DEV" = "$DEVICE" ]; then
+		echo $l | cut -d: -f2
+		#echo $SEALEDKEY
+		break
+	fi
+done)
+
+#SEALEDKEY=$(head -1 $keyf)
+#rm $keyf
+
 if [ -z "$SEALEDKEY" ]; then
 	warn "Unable to determine key name; falling back to password"
 	exit 255
 fi
 
-
 # Mount tmpfs to store luks keys
 if [ ! -d $TMPFS_MNT ]; then
 	mkdir $TMPFS_MNT
 	if [ $? -ne 0 ]; then
-		warn "Unable to create $TMPFS_MNT folder to securely store TPM NVRAM data."
+		warn "Unable to create $TMPFS_MNT folder to securely store unlocking key."
 		exit 255
 	fi
 fi
 
 mount -t tmpfs -o size=16K tmpfs $TMPFS_MNT
 if [ $? -ne 0 ]; then
-	warn "Unable to mount tmpfs area to securely store TPM NVRAM data."
+	warn "Unable to mount tmpfs area to securely store unlocking key."
 	exit 255
 fi
 
