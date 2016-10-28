@@ -1,5 +1,5 @@
 
-Storing your LUKS key in TPM NVRAM
+Storing your LUKS key in sealed TPM keyfile
 
 First read BUILD, to make sure you have all the runtime pre-reqs installed,
 including the upstream trousers and tpm-tools packages.
