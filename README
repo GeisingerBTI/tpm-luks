@@ -32,23 +32,26 @@ E. Security Considerations
       branch incorporates the change and cleanly builds an RPM.
 	  
 3. Support
-   I have only tested the functionality on RHEL7-based distributions (CentOS, SL, etc.).  Other distributions
-   are currently unsupported, but patches are welcome to increase the support level for other distributions.
+   I have only tested the functionality on RHEL7-based distributions (CentOS, SL, etc.).  Other 
+   distributions are currently unsupported, but patches are welcome to increase the support level for 
+   other distributions.
 
 === B. Setup ===
 
 1. Enable the TPM
-   Within the BIOS, ensure that the TPM is enabled.  You can check the status with /sys/class/tpm/tpm0/device/enabled
+   Within the BIOS, ensure that the TPM is enabled.  You can check the status with 
+   /sys/class/tpm/tpm0/device/enabled
    
 2. Install tpm-luks
-   Installing by building an RPM and installing the RPM is the preferred method of installation.  Building an RPM is
-   outside the scope of this document.
+   Installing by building an RPM and installing the RPM is the preferred method of installation.  
+   Building an RPM is outside the scope of this document.
    
 3. Edit /etc/tpm-luks.conf
-   If you installed via RPM, /etc/tpm-luks.conf should already be populated with the LUKS partitions that would automatically
-   unlock at boot time, as seen in /etc/crypttab.
+   If you installed via RPM, /etc/tpm-luks.conf should already be populated with the LUKS partitions 
+   that would automatically unlock at boot time, as seen in /etc/crypttab.
 
-4. Build a new initramfs.  You need to include the code to query the TPM at boot time, and this will do it for you.
+4. Build a new initramfs.  You need to include the code to query the TPM at boot time, and this will 
+   do it for you.
    # dracut -f
    
 5. Reboot
@@ -56,42 +59,52 @@ E. Security Considerations
 
 === C. Initialization ===
 
-0. OPTIONAL: If you would like to set a TPM owner password, you will need to take ownership manually.  By default,
-   on initialization, tpm-luks will take ownership with the Well-Known-Secret (20 bytes of "0") as the owner password.
-   If you choose to take ownership manually, tpm-luks REQUIRES the Well-Known-Secret for the SRK.
+0. OPTIONAL: If you would like to set a TPM owner password, you will need to take ownership manually.  
+   By default, on initialization, tpm-luks will take ownership with the Well-Known-Secret 
+   (20 bytes of "0") as the owner password. If you choose to take ownership manually, tpm-luks REQUIRES
+   the Well-Known-Secret for the SRK.
    
 1. Initialize the keys and seal to expected PCRs
    By running "tpm-luks-init" (as root), tpm-luks will do the following:
      a. Create a random 32-byte key used to unlock the LUKS partition.
-	 b. Seal the key to the precomputed PCRs and place the sealed file in the unencrypted /boot partition.
-	 c. Add the key to the highest numbered unused LUKS slot.  Will require an existing passphrase to enable.
+	 b. Seal the key to the precomputed PCRs and place the sealed file in the unencrypted 
+	    /boot partition.
+	 c. Add the key to the highest numbered unused LUKS slot.  Will require an existing passphrase 
+	    to enable.
 
 That's it!  On next reboot, under "normal" circumstances, there should be no passphrase prompt.
 
 === D. Upkeep ===
 
-tpm-luks installs a yum post-transaction hook in /etc/yum/post-actions/tpm-luks.action. Whenever the kernel package is
-updated, the hook runs the tpm-luks-update script, which attempts to migrate your current sealed key to a new set of
-precomputed PCRs.  To allow for repeated kernel updates, the current sealed file is moved to "<key>.old".
+tpm-luks installs a yum post-transaction hook in /etc/yum/post-actions/tpm-luks.action. Whenever the kernel 
+package is updated, the hook runs the tpm-luks-update script, which attempts to migrate your current sealed 
+key to a new set of precomputed PCRs.  To allow for repeated kernel updates, the current sealed file is moved 
+to "<key>.old".
 
 === E. Security Considerations ===
 
-When used as expected, tpm-luks should defend against most attacks that require physical access but no special hardware.
+When used as expected, tpm-luks should defend against most attacks that require physical access but no 
+special hardware.
+
 These attacks include:
 - Evil Maid:
-   Because the TPM measures the kernel, initramfs, and all grub modules, if any of those are tampered with on the 
-   unencrypted boot partition, you will be presented with a passphrase prompt.  Do not enter your passphrase if
-   you suspect physical tampering with the machine.
+   Because the TPM measures the kernel, initramfs, and all grub modules, if any of those are tampered 
+   with on the unencrypted boot partition, you will be presented with a passphrase prompt.  Do not enter 
+   your passphrase if you suspect physical tampering with the machine.
 - Single-user bootup
-   Because the grub commands are also measured, any additional kernel arguments passed will be detected and the
-   attacker will be presented with a passphrase prompt.  Note that this setting also obviates the need for a GRUB
-   password, which is typically easy to bypass with an unencrypted boot partition.
+   Because the grub commands are also measured, any additional kernel arguments passed will be detected 
+   and the attacker will be presented with a passphrase prompt.  Note that this setting also obviates the 
+   need for a GRUB password, which is typically easy to bypass with an unencrypted boot partition.
    
-Note however, that if you start "tcsd" and keep it running, you may create a security vulnerability where an authorized
-user could elevate privilege to root with physical access to the machine.  The attack would happen as follows:
+Note however, that if you start "tcsd" and keep it running, you may create a security vulnerability where an 
+authorized user could elevate privilege to root with physical access to the machine.  The attack would happen 
+as follows:
+
 1. User reboots into live CD, extracts the sealed key from the unencrypted /boot partition
 2. User reboots into "normal" mode, unseals the extracted key using "tpm_unsealdata"
-3. User reboots into live CD mode, uses unsealed key to unlock the LUKS partition and add a known passphrase into the header
-4. Finally, user reboots into single-user mode (attack #2 above) and uses the known passphrase to unlock the LUKS partition
+3. User reboots into live CD mode, uses unsealed key to unlock the LUKS partition and add a known passphrase 
+   into the LUKS header
+4. Finally, user reboots into single-user mode (attack #2 above) and uses the known passphrase to unlock the 
+   LUKS partition
 
 By not running "tcsd" or by limiting its use by normal users, step #2 in the attack above is impossible.
