@@ -14,23 +14,18 @@
 
  For using tpm-luks with a LUKS key on your rootfs volume: dracut grubby
 
- All uses: cryptsetup gawk coreutils tpm-tools-1.3.8 trousers-0.3.9
+ All uses: cryptsetup gawk coreutils tpm-tools-1.3.9 trousers-0.3.9
 
- tpm-luks requires very recent tpm-tools and trousers versions, likely not
-included in your distro. To get these versions, you'll need to install them
-from their upstream repositories:
+ tpm-luks requires very recent tpm-tools versions, not included in any distro.
+ To get these versions, you'll need to install them from our repository:
+ NOTE: branch rpm_fixes will also cleanly build an RPM on RHEL7 and derivatives.
 
- $ git clone git://trousers.git.sourceforge.net/gitroot/trousers/trousers trousers.git
- $ git clone git://trousers.git.sourceforge.net/gitroot/trousers/tpm-tools tpm-tools.git
- $ cd trousers.git
+ $ git clone git://github.com/GeisingerBTI/tpm-tools
+ $ cd tpm-tools
+ $ git checkout rpm_fixes
  $ sh bootstrap.sh
  $ ./configure
  $ make
  # make install
- $ cd ../tpm-tools.git
- $ sh bootstrap.sh
- $ ./configure
- $ make
- # make install
-
+ 
 EOF
