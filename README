@@ -23,8 +23,8 @@ E. Security Considerations
      a. trousers >= 0.3.9 (included in most modern distros)
      b. TrustedGRUB2 >= 1.4.1
       NOTE: This tpm-luks assumes that the kernel/initramfs are measured into PCR 14.
-      These changes are available in the "rpm_fixes" branch of the GeisignerBTI fork of TrustedGRUB2
-	  (see https://github.com/GeisignerBTI/TrustedGRUB2)
+      These changes are available in the "rpm_fixes" branch of the GeisingerBTI fork of TrustedGRUB2
+	  (see https://github.com/GeisingerBTI/TrustedGRUB2)
      c. tpm-tools >= 1.3.9
       NOTE: This tpm-tools incorporates a needed feautre addition to the stock tpm-tools,
       These changes are available in the git repository at https://github.com/GeisingerBTI/tpm-tools.
